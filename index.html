@@ -1,0 +1,1258 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E7C86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kökortet">
+<title>Kökortet</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230E7C86'/%3E%3Ctext x='32' y='45' font-family='Arial' font-weight='700' font-size='36' fill='white' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Firebase (databas + personalinloggning) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   FYLL I ERA FIREBASE-UPPGIFTER HÄR
+   Firebase-konsolen → Projektinställningar → Dina appar → Webbapp → "Config".
+   Uppgifterna är inte hemliga; säkerheten sköts av reglerna i firestore.rules.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+/* E-postadressen till det gemensamma personalkontot (Authentication → Users). */
+const STAFF_EMAIL = "personal@kokortet.se";
+</script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+/* Layout: app shell with a slim nav; terminal = big touch cards, personal = console + live board, skärm = dark split board for the waiting room */
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --surface-2:#F5F7F9; --ink:#111821; --muted:#5A6573; --line:#D8DEE5;
+  --accent:#0F5C6E; --accent-ink:#FFFFFF; --focus:#2F7FE0;
+  --c-blue:#2347D6; --c-red:#C9252C; --c-amber:#B87F00; --c-green:#1F8150; --c-violet:#6A3FC9; --c-teal:#0F7A86;
+  --ok:#1E8A4C; --warn:#A86400; --bad:#C2352B;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Figtree","Segoe UI",system-ui,sans-serif;
+  --r:16px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1117; --surface:#151C25; --surface-2:#1B2430; --ink:#E7ECF2; --muted:#94A1B1; --line:#283444;
+  --accent:#48B3C6; --accent-ink:#06181C; --focus:#6FA8FF;
+  --c-blue:#7189FF; --c-red:#FF6268; --c-amber:#F2B636; --c-green:#4CC285; --c-violet:#A88BFF; --c-teal:#3FC1CC;
+  --ok:#4CC285; --warn:#F2B636; --bad:#FF6B5E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1117; --surface:#151C25; --surface-2:#1B2430; --ink:#E7ECF2; --muted:#94A1B1; --line:#283444;
+  --accent:#48B3C6; --accent-ink:#06181C; --focus:#6FA8FF;
+  --c-blue:#7189FF; --c-red:#FF6268; --c-amber:#F2B636; --c-green:#4CC285; --c-violet:#A88BFF; --c-teal:#3FC1CC;
+  --ok:#4CC285; --warn:#F2B636; --bad:#FF6B5E; color-scheme:dark}
+/* Terminal and waiting-room screen commit to one bright, daylight look whatever the device theme */
+body.kiosk,.tv{--bg:#EEF4F7; --surface:#FFFFFF; --surface-2:#F5F9FB; --ink:#16212C; --muted:#5C6977; --line:#DCE4EB;
+  --accent:#0E7C86; --accent-ink:#FFFFFF; --focus:#2F7FE0;
+  --c-blue:#2F5BEA; --c-red:#D23A40; --c-amber:#B97D00; --c-green:#1F8150; --c-violet:#6A3FC9; --c-teal:#0F7A86;
+  --ok:#1E8A4C; --warn:#A86400; --bad:#C2352B; color-scheme:light}
+.tv{--bg:#F5FAFC; --glow:#DDF0F1}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+.label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#app{display:flex;flex-direction:column;min-height:100%}
+#view{flex:1;display:flex;flex-direction:column}
+
+/* nav */
+#nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:19px;margin-right:auto}
+.logo i{width:28px;height:28px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-style:normal;font-size:15px}
+.tabs-nav{display:flex;gap:4px;flex-wrap:wrap}
+.tabs-nav a{padding:8px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-weight:600;font-size:14px}
+.tabs-nav a:hover{background:var(--surface-2);color:var(--ink)}
+.tabs-nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.mode-pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.mode-pill.live{color:var(--ok)}
+.mode-pill.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+body.kiosk #nav{display:none}
+body.kiosk.nav-open #nav{display:flex}
+#kiosk-key{position:fixed;top:calc(6px + env(safe-area-inset-top,0px));right:calc(6px + env(safe-area-inset-right,0px));width:44px;height:44px;border:0;background:transparent;z-index:20;border-radius:50%;display:none;touch-action:none}
+body.kiosk #kiosk-key{display:block}
+#kiosk-key::after{content:"";position:absolute;inset:18px;border-radius:50%;background:var(--line);opacity:.6}
+#kiosk-key.holding::after{background:var(--accent);opacity:1;transition:inset 1.1s linear;inset:6px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{min-height:34px;padding:0 10px;font-size:14px;border-radius:9px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:6px}
+.input,select.input{min-height:44px;border-radius:11px;border:1px solid var(--line);background:var(--surface);padding:0 12px;width:100%}
+.input:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 25%,transparent)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--b,var(--muted)) 14%,transparent);color:var(--b,var(--muted));white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--b,var(--muted));flex:none}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:calc(100% - 32px)}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.banner{background:color-mix(in srgb,var(--warn) 14%,var(--surface));color:var(--ink);border-bottom:1px solid var(--line);font-size:14px;
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---------- Terminal ---------- */
+.term{flex:1;display:flex;flex-direction:column;gap:24px;padding-block:28px 0;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));max-width:1180px;width:100%;margin:0 auto}
+.t-top{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.t-top .clock{font-size:22px;font-weight:700}
+.t-head h1{font-size:clamp(34px,5.4vw,60px);font-weight:800;letter-spacing:-.02em}
+.t-head p{font-size:clamp(18px,2.2vw,23px);color:var(--muted);margin:10px 0 0}
+.t-brands{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.t-brand{--b:var(--c-blue);position:relative;text-align:left;border:2px solid var(--line);background:var(--surface);border-radius:24px;padding:26px 24px 22px;display:flex;flex-direction:column;gap:8px;cursor:pointer;min-height:300px;overflow:hidden;transition:transform .15s,border-color .15s}
+.t-brand::before{content:"";position:absolute;inset:0 0 auto;height:8px;background:var(--b)}
+.t-brand:active{transform:scale(.98)}
+.t-brand:hover{border-color:var(--b)}
+.t-mark{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;background:color-mix(in srgb,var(--b) 14%,transparent);color:var(--b);font-family:var(--display);font-weight:800;font-size:30px;margin-bottom:8px}
+.t-brand-name{font-family:var(--display);font-size:32px;font-weight:800;letter-spacing:-.015em}
+.t-brand-tag{font-size:19px;font-weight:600;color:var(--b)}
+.t-brand-list{color:var(--muted);font-size:16px;margin-top:auto}
+.t-brand-q{font-size:14px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px}
+.t-purposes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.t-purpose{--b:var(--c-blue);text-align:left;border:2px solid var(--line);background:var(--surface);border-radius:20px;padding:22px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:130px}
+.t-purpose:hover{border-color:var(--b)}
+.t-purpose b{font-family:var(--display);font-size:27px;font-weight:700}
+.t-purpose span{color:var(--muted);font-size:17px}
+.t-back{align-self:flex-start;font-size:18px;min-height:52px;padding:0 20px}
+.t-form{display:grid;gap:18px;max-width:640px}
+.t-form .input{min-height:68px;font-size:26px;border-radius:16px;padding:0 20px;border-width:2px}
+.t-form label{font-size:18px;font-weight:600}
+.t-form .btn{min-height:72px;font-size:22px;border-radius:18px}
+.t-crumb{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:18px}
+.t-done{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;align-items:stretch}
+.t-ticket{--b:var(--c-blue);background:color-mix(in srgb,var(--b) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--b) 25%,var(--line));border-radius:28px;padding:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;position:relative;overflow:hidden}
+.t-ticket .who{font-family:var(--display);font-size:clamp(34px,5vw,56px);font-weight:800;line-height:1.05}
+.av{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--b,var(--accent)) 15%,var(--surface));color:var(--b,var(--accent));font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em;box-shadow:0 0 0 3px var(--surface),0 0 0 5px color-mix(in srgb,var(--b,var(--accent)) 30%,transparent)}
+.av-xl{width:clamp(96px,12vw,132px);height:clamp(96px,12vw,132px);font-size:clamp(36px,4.6vw,50px)}
+.dir{flex:none;width:clamp(44px,4vw,64px);height:clamp(44px,4vw,64px);border-radius:50%;display:grid;place-items:center;background:var(--b);color:#fff;font-weight:800;font-size:clamp(22px,2.2vw,34px)}
+.t-steps{display:flex;flex-direction:column;gap:14px;font-size:20px}
+.t-step{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px}
+.t-step i{flex:none;width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-style:normal;font-weight:700;font-family:var(--display)}
+.t-step b{display:block}
+.t-reset{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:17px}
+.t-qr-card{display:flex;align-items:center;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+.t-qr-card .qr{flex:none;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px}
+.t-qr-card .qr img,.t-qr-card .qr canvas,.t-qr-card .qr table{display:block}
+.t-qr-card b{display:block;font-family:var(--display);font-size:20px;margin-bottom:2px}
+.t-qr-card .muted{font-size:16px}
+.t-ticker{margin-top:auto;margin-inline:calc(-1 * max(20px,env(safe-area-inset-left,0px)));background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--ink);border-top:1px solid var(--line);display:flex;align-items:center;gap:20px;min-height:64px;overflow:hidden;
+  padding-block:12px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.t-ticker .label{color:var(--accent)}
+.t-ticker-items{display:flex;gap:28px;flex-wrap:wrap;font-size:19px;font-weight:600}
+.t-ticker-items span b{font-family:var(--display);margin-right:8px}
+.flash{animation:flash 1.2s ease 3}
+@keyframes flash{50%{background:var(--accent);color:var(--accent-ink)}}
+
+/* ---------- Personal ---------- */
+.staff{flex:1;display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;width:100%;margin:0 auto;align-items:start}
+.console{display:flex;flex-direction:column;gap:16px;position:sticky;top:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{--b:var(--muted);display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 12px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:14px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--b);background:color-mix(in srgb,var(--b) 12%,var(--surface))}
+.call-next{min-height:64px;font-size:20px;border-radius:14px}
+.current{--b:var(--c-blue);border:2px solid var(--b);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.current .n{font-size:44px;font-weight:800;color:var(--b);line-height:1}
+.current .nm{font-family:var(--display);font-size:24px;font-weight:700}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.empty{color:var(--muted);text-align:center;padding:28px 16px;border:1.5px dashed var(--line);border-radius:var(--r)}
+.board{display:flex;flex-direction:column;gap:16px;min-width:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{--b:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.stat .head{display:flex;align-items:center;gap:8px;font-weight:700}
+.stat .v{font-size:34px;font-weight:800;line-height:1.05}
+.stat .s{font-size:13px;color:var(--muted)}
+.seg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;align-self:flex-start;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:8px 14px;border-radius:9px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.seg .c{font-variant-numeric:tabular-nums;opacity:.7;margin-left:4px}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{--b:var(--muted);display:grid;grid-template-columns:44px minmax(0,1.4fr) minmax(0,1.2fr) 90px auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.row .av{width:44px;height:44px;font-size:16px;box-shadow:none}
+.current .av{width:56px;height:56px;font-size:21px}
+.row .nm{font-weight:700;overflow-wrap:anywhere}
+.row .sub{font-size:13px;color:var(--muted)}
+.row .wait{font-variant-numeric:tabular-nums;font-weight:700}
+.row .wait.long{color:var(--bad)}
+.row .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.reg{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:.06em;border:1.5px solid var(--ink);border-radius:5px;padding:1px 6px;background:var(--surface);white-space:nowrap}
+.transfer{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:8px;border-top:1px dashed var(--line)}
+.transfer select{flex:1;min-width:180px}
+details.panel summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between}
+details.panel summary::after{content:"+";font-size:20px;line-height:1;color:var(--muted)}
+details[open].panel summary::after{content:"–"}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ---------- Settings ---------- */
+.settings{padding-block:24px 110px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1100px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.settings h2{font-size:24px}
+.set-intro{color:var(--muted);max-width:68ch;margin:6px 0 0}
+.brand-card{--b:var(--c-blue);background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--b);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.f-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.p-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.p-head{font-size:12px;color:var(--muted);font-weight:600}
+.toggle{position:relative;width:48px;height:28px;flex:none}
+.toggle input{opacity:0;position:absolute;inset:0;margin:0;cursor:pointer;z-index:1}
+.toggle span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.2s}
+.toggle span::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--surface);transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle input:checked+span{background:var(--ok)}
+.toggle input:checked+span::after{left:23px}
+.toggle input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+.d-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,170px) auto;gap:8px;align-items:center}
+.g-row{display:grid;grid-template-columns:190px minmax(0,1fr) auto;gap:8px;align-items:center}
+.g-max{display:flex;align-items:center;gap:8px;font-weight:600;white-space:nowrap}
+.g-max .input{width:84px}
+.savebar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:flex-end;z-index:15;
+  padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.savebar .muted{margin-right:auto}
+.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.links a{display:block;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);text-decoration:none;color:var(--ink)}
+.links a b{display:block;font-family:var(--display);font-size:18px}
+
+/* ---------- Följ i mobilen ---------- */
+body.customer #nav{display:none}
+.follow{flex:1;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px;
+  padding-block:18px calc(28px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.f-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.f-top .clock{font-size:20px;font-weight:700}
+.f-card{--b:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.f-card.f-id{flex-direction:row;text-align:left;align-items:center;gap:14px;padding:14px 16px}
+.f-card.called{border:2px solid var(--b);background:color-mix(in srgb,var(--b) 8%,var(--surface));animation:fpulse 2s ease infinite}
+@keyframes fpulse{50%{box-shadow:0 0 0 10px color-mix(in srgb,var(--b) 16%,transparent)}}
+.f-pos{font-family:var(--display);font-size:72px;font-weight:800;color:var(--b);line-height:1}
+.f-big{font-family:var(--display);font-size:34px;font-weight:800;line-height:1.1;text-wrap:balance}
+.f-big.f-call{font-size:29px;font-weight:600;line-height:1.18}
+.f-note{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600;color:var(--ok)}
+
+/* ---------- Skärm (TV) ---------- */
+.tv-wrap::before{content:"";position:absolute;width:48vw;aspect-ratio:1;border-radius:50%;right:-14vw;bottom:-24vw;background:var(--glow)}
+.tv-wrap::after{content:"";position:absolute;width:16vw;aspect-ratio:1;border-radius:50%;left:-5vw;top:-7vw;background:color-mix(in srgb,var(--c-amber) 12%,var(--bg))}
+.tv-wrap>*{position:relative;z-index:1}
+.tv-wrap{position:relative;overflow:hidden;flex:1;display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:28px;background:var(--bg);color:var(--ink);
+  padding-block:32px;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}
+.tv-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.tv-head h1{font-size:clamp(30px,3.6vw,54px);font-weight:800;letter-spacing:-.02em}
+.tv-head .clock{font-size:clamp(36px,4vw,64px);font-weight:800}
+.tv-calls{display:flex;flex-direction:column;gap:14px;min-width:0}
+.tv-call{--b:var(--c-blue);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:24px;background:var(--surface);border-radius:26px;padding:18px 24px;box-shadow:0 2px 10px rgba(22,52,72,.07),0 0 0 1px rgba(22,52,72,.05)}
+.tv-call:first-child{padding:28px 30px;background:color-mix(in srgb,var(--b) 9%,var(--surface));box-shadow:0 12px 34px -12px color-mix(in srgb,var(--b) 40%,transparent),0 0 0 1px color-mix(in srgb,var(--b) 18%,transparent)}
+.tv-call .av{width:clamp(56px,5.5vw,84px);height:clamp(56px,5.5vw,84px);font-size:clamp(22px,2.2vw,34px)}
+.tv-call:first-child .av{width:clamp(84px,8.5vw,136px);height:clamp(84px,8.5vw,136px);font-size:clamp(32px,3.4vw,54px)}
+.tv-call .nm{font-family:var(--display);font-size:clamp(20px,1.9vw,32px);font-weight:600;overflow-wrap:anywhere;line-height:1.15;text-wrap:balance}
+.tv-call:first-child .nm{font-size:clamp(30px,3.2vw,56px);letter-spacing:-.01em;line-height:1.1}
+.tv-call .hi{display:flex;align-items:center;gap:10px;font-family:var(--body);font-size:clamp(14px,1.2vw,21px);font-weight:600;color:var(--b);letter-spacing:0;margin-bottom:6px}
+/* the call sentence: name and desk carry the weight, the desk glows "green light" */
+.cn{font-weight:800;color:var(--ink);white-space:nowrap}
+.tv-call .to>span:not(.dir){max-width:15ch}
+.cd{font-weight:800;color:var(--ok);white-space:nowrap}
+.gl{flex:none;display:inline-block;width:.7em;height:.7em;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent),0 0 12px color-mix(in srgb,var(--ok) 70%,transparent)}
+.gl-label{display:inline-flex;align-items:center;gap:8px;color:var(--ok)}
+.tv-call .to{display:flex;align-items:center;gap:16px;text-align:right;font-size:clamp(16px,1.5vw,24px);color:var(--muted)}
+.tv-call .to b{display:block;font-family:var(--display);font-size:clamp(24px,2.4vw,40px);color:var(--ink)}
+.tv-call:not(:first-child) .dir{width:clamp(36px,3vw,48px);height:clamp(36px,3vw,48px);font-size:clamp(18px,1.6vw,26px)}
+.tv-call.new{animation:tvnew 1.4s ease 3}
+@keyframes tvnew{50%{transform:scale(1.015);box-shadow:0 0 0 8px color-mix(in srgb,var(--b) 40%,transparent)}}
+.tv-side{display:flex;flex-direction:column;gap:14px}
+.tv-q{--b:var(--c-blue);background:var(--surface);border-radius:20px;padding:18px 22px;display:flex;flex-direction:column;gap:6px}
+.tv-q .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tv-q h3{font-size:clamp(20px,1.9vw,30px)}
+.tv-q .v{font-size:clamp(34px,3.4vw,56px);font-weight:800;color:var(--b);line-height:1}
+.tv-q .s{color:var(--muted);font-size:clamp(15px,1.3vw,20px)}
+.tv-msg{grid-column:1/-1;color:var(--muted);font-size:clamp(16px,1.5vw,24px);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
+.tv-empty{display:grid;place-items:center;text-align:center;border:2px dashed var(--line);border-radius:22px;min-height:300px;font-size:clamp(22px,2.4vw,36px);color:var(--muted);padding:24px}
+
+@media (max-width:900px){
+  .staff{grid-template-columns:1fr}
+  .console{position:static}
+  .t-done{grid-template-columns:1fr}
+  .tv-wrap{grid-template-columns:1fr;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .tv-call{grid-template-columns:auto minmax(0,1fr);gap:14px}
+  .tv-call .to{grid-column:1/-1;text-align:left}
+}
+@media (max-width:640px){
+  .row{grid-template-columns:44px minmax(0,1fr) auto}
+  .row .pcol{grid-column:2/-1;grid-row:2}
+  .row .acts{grid-column:1/-1}
+  .p-row{grid-template-columns:1fr auto auto}
+  .p-row .p-hint,.p-row .p-desk{grid-column:1/-1}
+  .p-head{display:none}
+  .d-row{grid-template-columns:1fr auto}
+  .d-row .d-loc{grid-column:1/-1;grid-row:2}
+  .d-row .d-dir{grid-column:1/-1;grid-row:3}
+  .d-row>button{grid-column:2;grid-row:1}
+  .g-row{grid-template-columns:1fr auto}
+  .g-row>.input{grid-column:1/-1;grid-row:2}
+  .g-row>button,.g-row>span:last-child{grid-column:2;grid-row:1}
+  .t-brand{min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- Personalinloggning ---------- */
+.login{flex:1;display:grid;place-items:center;padding:32px 16px}
+.login form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.login h2{font-size:26px}
+.who-pill{display:inline-flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <nav id="nav" aria-label="Vyer">
+    <div class="logo"><i>K</i>Kökortet</div>
+    <div class="tabs-nav" id="tabs-nav">
+      <a href="#terminal" data-v="terminal">Terminal</a>
+      <a href="#skarm" data-v="skarm">Väntrumsskärm</a>
+      <a href="#personal" data-v="personal">Personal</a>
+      <a href="#installningar" data-v="installningar">Inställningar</a>
+    </div>
+    <span class="mode-pill" id="mode-pill">Ansluter…</span>
+    <button class="btn sm ghost" id="logout" data-act="logout" hidden>Logga ut</button>
+  </nav>
+  <div id="banner" class="banner" hidden></div>
+  <main id="view"></main>
+</div>
+<button id="kiosk-key" aria-label="Håll inne för personalmeny"></button>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const DEFAULT_CONFIG = {
+  brands: [
+    { id:'kvdbil', name:'KVD Bil', tagline:'Bilförsäljning', prefix:'K', color:'blue', enabled:true,
+      waitText:'Ta plats i loungen vid entrén',
+      purposes:[
+        { id:'hamta', label:'Hämta bil', hint:'Du har köpt en bil och ska hämta ut den', enabled:true, desk:'u1' },
+        { id:'lamna', label:'Lämna bil', hint:'Du ska lämna in en bil som vi säljer åt dig', enabled:true, desk:'d1' },
+        { id:'provkor', label:'Provkörning', hint:'Du har bokat eller vill göra en provkörning', enabled:true, desk:'d2' },
+        { id:'ovrigt', label:'Övrigt ärende', hint:'Frågor om köp, betalning eller papper', enabled:true, desk:'d1' }
+      ]},
+    { id:'autoexperten', name:'Autoexperten', tagline:'Verkstadsbesök', prefix:'A', color:'red', enabled:true,
+      waitText:'Ta plats i loungen, verkstaden ropar dig här',
+      purposes:[
+        { id:'inlamning', label:'Lämna in bil', hint:'Service, reparation eller däckbyte', enabled:true, desk:'v1' },
+        { id:'upphamtning', label:'Hämta bil', hint:'Din bil är klar att hämtas', enabled:true, desk:'v1' }
+      ]},
+    { id:'carglass', name:'Carglass', tagline:'Bilglasbyte', prefix:'C', color:'amber', enabled:true,
+      waitText:'Ta plats i loungen, Carglass ropar dig här',
+      purposes:[
+        { id:'inlamning', label:'Lämna in bil', hint:'Stenskott eller rutbyte', enabled:true, desk:'g1' },
+        { id:'upphamtning', label:'Hämta bil', hint:'Ditt glasbyte är klart', enabled:true, desk:'g1' }
+      ]}
+  ],
+  desks: [
+    { id:'d1', name:'Disk 1', location:'Receptionen, vänster sida', dir:'left' },
+    { id:'d2', name:'Disk 2', location:'Receptionen, höger sida', dir:'right' },
+    { id:'u1', name:'Utlämningen', location:'Glasdörren mot parkering P2', dir:'straight' },
+    { id:'v1', name:'Verkstadsdisken', location:'Genom korridoren till höger', dir:'right' },
+    { id:'g1', name:'Carglass-disken', location:'Hall B, vid port 3', dir:'left' }
+  ],
+  greetings:[
+    { upTo:10, text:'Välkommen' },
+    { upTo:20, text:'Tack för väntan' },
+    { upTo:30, text:'Äntligen' }
+  ],
+  greetingLong:'Tack för ditt tålamod',
+  nameFormat:'short',
+  screenMessage:'Välkommen! Håll utkik här, vi ropar ditt namn och visar vart du ska gå.',
+  retentionDays:30,
+  follow:{ enabled:true, url:'' },
+  callText:'{halsning} {namn} – du har grönt ljus till {disk}',
+};
+const COLORS = { blue:'Blå', red:'Röd', amber:'Gul', green:'Grön', violet:'Lila', teal:'Petrol' };
+const DIRS = { left:['←','till vänster'], right:['→','till höger'], straight:['↑','rakt fram'], back:['↓','bakåt'] };
+const STATUS = { waiting:'Väntar', called:'Ropad', serving:'Betjänas', done:'Klar', noshow:'Kom ej' };
+const VIEWS = ['terminal','skarm','personal','installningar'];
+
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const dayStr = (t=Date.now()) => { const d=new Date(t); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const clock = (t=Date.now()) => { const d=new Date(t); return pad(d.getHours())+':'+pad(d.getMinutes()); };
+const mins = ms => Math.max(0, Math.floor(ms/60000));
+const uid = () => Math.random().toString(36).slice(2,8);
+const ls = {
+  get(k,d){ try{ const v=localStorage.getItem('kolotsen.'+k); return v==null?d:JSON.parse(v); }catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem('kolotsen.'+k, JSON.stringify(v)); }catch{} }
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+
+const S = {
+  cfg:null, tickets:[], loaded:false, view:'personal', day:dayStr(),
+  term:{ step:'brand', brand:null, purpose:null, result:null, resetAt:0 },
+  staff:{ desk:ls.get('desk',''), brands:ls.get('brands',null), tab:'waiting', transferId:null, confirmClear:false },
+  draft:null, dirty:false, seen:{}, firstSnap:true, sound:false, audio:null, navOpen:false, unsubT:null, followId:null, notify:false, alerts:false,
+  user:null, authReady:false, raw:[], priv:{}, unsubP:null, followDay:null, followBrand:null
+};
+
+/* ---------- Store: Firebase Firestore when configured, otherwise an in-browser demo ----------
+   tickets/{id}  public: what the terminal, TV and the customer's phone need (display name only)
+   private/{id}  staff only: full name, phone and reg.nr. — readable only when signed in */
+const PRIV_KEYS = ['name','phone','regnr'];
+function fireStore(db){
+  const splitPatch = p => {
+    const pub = {}, priv = {};
+    for (const [k,v] of Object.entries(p)) (PRIV_KEYS.includes(k) ? priv : pub)[k] = v;
+    return [pub, priv];
+  };
+  return {
+    live:true,
+    watchConfig(cb, err){ return db.doc('config/main').onSnapshot(s => cb(s.exists ? s.data() : null, s.metadata), err); },
+    watchTickets(day, cb, err, brandId){
+      let q = db.collection('tickets').where('day','==',day);
+      if (brandId) q = q.where('brand','==',brandId);
+      return q.onSnapshot(s => cb(s.docs.map(d => ({ id:d.id, ...d.data() })), s.metadata), err);
+    },
+    watchPrivate(day, cb, err){
+      return db.collection('private').where('day','==',day).onSnapshot(s => {
+        const m = {}; s.docs.forEach(d => { m[d.id] = d.data(); }); cb(m);
+      }, err);
+    },
+    async getTicket(id){ const s = await db.doc('tickets/'+id).get(); return s.exists ? { id:s.id, ...s.data() } : null; },
+    add(t){
+      const { id, name, phone, regnr, ...rest } = t;
+      const b = db.batch();
+      b.set(db.doc('tickets/'+id), { ...rest, name:shortName(name) });
+      b.set(db.doc('private/'+id), { day:t.day, name, phone:phone || '', regnr:regnr || '' });
+      return b.commit();
+    },
+    update(id, p){
+      const [pub, priv] = splitPatch(p), b = db.batch();
+      if (Object.keys(pub).length) b.update(db.doc('tickets/'+id), pub);
+      if (Object.keys(priv).length) b.set(db.doc('private/'+id), priv, { merge:true });
+      return b.commit();
+    },
+    remove(id){ const b = db.batch(); b.delete(db.doc('tickets/'+id)); b.delete(db.doc('private/'+id)); return b.commit(); },
+    saveConfig(c){ return db.doc('config/main').set(c); },
+    async prune(cutoff){
+      let n = 0;
+      for (const col of ['tickets','private']){
+        const s = await db.collection(col).where('day','<',cutoff).limit(400).get();
+        if (!s.size) continue;
+        const b = db.batch(); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
+      }
+      return n;
+    }
+  };
+}
+const fbConfigured = () => !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && window.firebase);
+function memStore(){
+  let cfg = null, rows = [], tl = [], cl = [];
+  const emitT = () => tl.forEach(f => f.cb(rows.filter(r => r.day===f.day).map(r => ({...r})), {fromCache:false}));
+  const emitC = () => cl.forEach(f => f(cfg && clone(cfg), {fromCache:false}));
+  return {
+    live:false,
+    watchConfig(cb){ cl.push(cb); setTimeout(() => cb(cfg && clone(cfg), {fromCache:false})); return () => {}; },
+    watchTickets(day, cb){ const f={day,cb}; tl.push(f); setTimeout(emitT); return () => { tl = tl.filter(x => x!==f); }; },
+    watchPrivate(){ return () => {}; },
+    async getTicket(id){ const r = rows.find(x => x.id===id); return r ? {...r} : null; },
+    async add(t){ rows.push({...t}); emitT(); },
+    async update(id, p){ const r = rows.find(x => x.id===id); if (r) Object.assign(r, p); emitT(); },
+    async remove(id){ rows = rows.filter(x => x.id!==id); emitT(); },
+    async saveConfig(c){ cfg = clone(c); emitC(); },
+    async prune(){ return 0; }
+  };
+}
+const stripId = t => { const { id, ...rest } = t; return rest; };
+let store = null;
+
+async function write(fn, okMsg){
+  try { await fn(); if (okMsg) toast(okMsg); return true; }
+  catch(e){
+    toast(e?.code==='resource-exhausted' ? 'Dagens gratiskvot i Firebase är slut. Kön fungerar igen i morgon, eller uppgradera projektet.'
+      : e?.code==='permission-denied' ? (S.user ? 'Databasen nekade ändringen. Kontrollera säkerhetsreglerna i Firebase.' : 'Logga in som personal för att ändra kön.')
+      : e?.code==='unavailable' ? 'Ingen anslutning till databasen just nu. Försök igen om en stund.'
+      : 'Kunde inte spara. Försök igen.');
+    return false;
+  }
+}
+
+/* ---------- Config & ticket helpers ---------- */
+const cfg = () => S.cfg || DEFAULT_CONFIG;
+const brandsOn = () => cfg().brands.filter(b => b.enabled !== false);
+const brand = id => cfg().brands.find(b => b.id===id);
+const desk = id => cfg().desks.find(d => d.id===id);
+const purposeOf = t => brand(t.brand)?.purposes.find(p => p.id===t.purpose);
+const bvar = b => `--b:var(--c-${b?.color || 'teal'})`;
+const num = t => (brand(t.brand)?.prefix || '') + t.seq;
+function shortName(n){
+  n = String(n||'').trim();
+  if (cfg().nameFormat === 'full') return n;
+  const p = n.split(/\s+/);
+  return p.length > 1 ? `${p[0]} ${p[p.length-1][0].toUpperCase()}.` : p[0];
+}
+function initials(n){
+  const p = String(n||'').trim().split(/\s+/).filter(Boolean);
+  return ((p[0]?.[0] || '') + (p.length > 1 ? p[p.length-1][0] : '')).toUpperCase();
+}
+function greetingFor(min){
+  const m = Number.isFinite(min) ? min : 0;
+  const g = [...(cfg().greetings || [])].sort((a,b) => a.upTo-b.upTo).find(x => m <= x.upTo);
+  return g ? g.text : (cfg().greetingLong || 'Välkommen!');
+}
+const callGreeting = t => greetingFor(mins((t.calledAt || Date.now()) - t.createdAt));
+const trimEnd = s => String(s || '').replace(/[\s!.,?:;–-]+$/, '');
+/* The call line: "Välkommen Robert – du har grönt ljus till Disk 2". who: screen (Robert S.), speech, first (Robert) */
+function callText(t, who = 'screen', html = false){
+  const d = desk(t.desk);
+  const namn = who === 'first' ? String(t.name || '').trim().split(/\s+/)[0]
+    : who === 'speech' ? shortName(t.name).replace('.', '') : shortName(t.name);
+  const v = { halsning:trimEnd(callGreeting(t)), namn, disk:d?.name || 'disken', plats:d?.location || '', foretag:brand(t.brand)?.name || '' };
+  const tpl = String(cfg().callText || DEFAULT_CONFIG.callText);
+  const out = tpl.split(/(\{\w+\})/).map(seg => {
+    const k = (seg.match(/^\{(\w+)\}$/) || [])[1];
+    if (!k || !(k in v)) return html ? esc(seg) : seg;
+    if (!html) return v[k];
+    return k === 'namn' ? `<span class="cn">${esc(v[k])}</span>` : k === 'disk' ? `<span class="cd">${esc(v[k])}</span>` : esc(v[k]);
+  }).join('').replace(/\s+/g, ' ').trim().replace(/ ([–—-]) /g, ' $1 ');
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+const greet = () => { const h = new Date().getHours(); return h < 10 ? 'God morgon' : h < 18 ? 'Hej' : 'God kväll'; };
+const dirOf = d => DIRS[d?.dir] || null;
+const waiting = bId => S.tickets.filter(t => t.status==='waiting' && (!bId || t.brand===bId)).sort((a,b) => a.createdAt-b.createdAt);
+function avgService(bId){
+  const d = S.tickets.filter(t => t.brand===bId && t.status==='done' && t.doneAt && (t.servedAt || t.calledAt));
+  if (d.length < 2) return 6;
+  const m = d.reduce((s,t) => s + (t.doneAt - (t.servedAt || t.calledAt)), 0) / d.length / 60000;
+  return Math.min(30, Math.max(2, m));
+}
+function estWait(bId, ahead){
+  const activeDesks = new Set(S.tickets.filter(t => t.brand===bId && ['called','serving'].includes(t.status)).map(t => t.desk)).size || 1;
+  return Math.round(ahead * avgService(bId) / activeDesks);
+}
+const waitLabel = m => m <= 1 ? 'strax' : `ca ${m} min`;
+function nextSeq(bId){ return S.tickets.filter(t => t.brand===bId).reduce((m,t) => Math.max(m, t.seq||0), 0) + 1; }
+
+/* ---------- Data subscriptions ---------- */
+function mergeTickets(){ S.tickets = S.raw.map(r => S.priv[r.id] ? { ...r, ...S.priv[r.id] } : r); }
+function subscribeTickets(){
+  if (S.unsubT) S.unsubT();
+  S.day = S.followDay || dayStr(); S.loaded = false;
+  const timer = setTimeout(() => { if (!S.loaded) showBanner('Kön går inte att nå just nu. Visningen uppdateras så fort anslutningen är tillbaka.'); }, 10000);
+  S.unsubT = store.watchTickets(S.day, (rows, meta) => {
+    S.raw = rows; mergeTickets();
+    if (!meta?.fromCache){ S.loaded = true; clearTimeout(timer); if (store.live) showBanner(''); }
+    detectCalls(rows);
+    renderData();
+  }, () => { clearTimeout(timer); showBanner('Anslutningen till kön bröts. Ladda om sidan för att ansluta igen.'); }, S.followBrand);
+  subscribePrivate();
+}
+function subscribePrivate(){
+  if (S.unsubP){ S.unsubP(); S.unsubP = null; }
+  S.priv = {};
+  if (S.user && store?.live && !S.followBrand){
+    S.unsubP = store.watchPrivate(S.day, m => { S.priv = m; mergeTickets(); renderData(); }, () => {});
+  }
+  mergeTickets();
+}
+function detectCalls(rows){
+  const fresh = [];
+  for (const t of rows){
+    if (t.status !== 'called') continue;
+    const c = t.callCount || 1;
+    if (!S.firstSnap && (S.seen[t.id] || 0) < c) fresh.push(t);
+    S.seen[t.id] = c;
+  }
+  S.firstSnap = false;
+  if (fresh.length) announce(fresh);
+}
+
+/* ---------- Announcements ---------- */
+function chime(){
+  if (!S.audio) return;
+  const ctx = S.audio, now = ctx.currentTime;
+  [[880,0],[660,.32]].forEach(([f,o]) => {
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.value = f;
+    g.gain.setValueAtTime(0, now+o); g.gain.linearRampToValueAtTime(.35, now+o+.02); g.gain.exponentialRampToValueAtTime(.001, now+o+1.1);
+    osc.connect(g).connect(ctx.destination); osc.start(now+o); osc.stop(now+o+1.2);
+  });
+}
+function announce(list){
+  S.justCalled = new Set(list.map(t => t.id));
+  if (S.view === 'skarm' && S.sound){
+    chime();
+    try {
+      const say = list.map(t => callText(t, 'speech')).join('. ');
+      setTimeout(() => { const u = new SpeechSynthesisUtterance(say); u.lang = 'sv-SE'; u.rate = .95; speechSynthesis.speak(u); }, 900);
+    } catch {}
+  }
+  if (S.view === 'terminal') $('#t-ticker')?.classList.add('flash');
+  if (S.view === 'folj' && S.followId){
+    const mine = list.find(t => t.id === S.followId);
+    if (mine) notifyFollow(mine);
+  }
+}
+
+/* ---------- Routing & shell ---------- */
+function route(){
+  const h = location.hash.slice(1);
+  const m = h.match(/^folj=(.+)$/);
+  if (m) S.followId = decodeURIComponent(m[1]);
+  const v = m ? 'folj' : (VIEWS.includes(h) ? h : 'personal');
+  if (S.view === 'folj' && v !== 'folj' && (S.followBrand || S.followDay)){
+    S.followBrand = null; S.followDay = null;
+    if (store){ S.seen = {}; S.firstSnap = true; subscribeTickets(); }
+  }
+  if (S.view === 'installningar' && v !== 'installningar') S.draft = null;
+  S.view = v;
+  document.body.classList.toggle('kiosk', v==='terminal' || v==='skarm');
+  document.body.classList.toggle('customer', v==='folj');
+  document.body.classList.remove('nav-open'); S.navOpen = false;
+  document.querySelectorAll('#tabs-nav a').forEach(a => a.dataset.v===v ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
+  if (v==='terminal' || v==='skarm' || v==='folj'){ try { navigator.wakeLock?.request('screen').catch(()=>{}); } catch {} }
+  renderView();
+}
+function showBanner(msg){ const b = $('#banner'); b.textContent = msg; b.hidden = !msg; }
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+const needsLogin = () => (store ? store.live : fbConfigured()) && !S.user && (S.view==='personal' || S.view==='installningar');
+function loginHTML(){
+  if (!S.authReady) return `<div class="login"><div class="empty">Ansluter…</div></div>`;
+  return `<div class="login"><form id="lg-form">
+    <h2>Personal</h2>
+    <p class="muted" style="margin:0">Logga in med personalens lösenord för att ropa kunder och ändra inställningar.</p>
+    <input type="email" name="username" autocomplete="username" value="${esc(STAFF_EMAIL)}" hidden>
+    <div class="field"><label class="label" for="lg-pw">Lösenord</label><input class="input" id="lg-pw" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn primary" type="submit">Logga in</button>
+    <span class="muted" style="font-size:13px">Du förblir inloggad på den här enheten tills du loggar ut. Logga inte in på terminalen eller väntrumsskärmen.</span>
+  </form></div>`;
+}
+function renderView(){
+  const v = $('#view');
+  if (needsLogin()){ v.innerHTML = loginHTML(); setTimeout(() => $('#lg-pw')?.focus(), 50); return; }
+  if (S.view==='terminal') v.innerHTML = terminalHTML();
+  else if (S.view==='skarm') v.innerHTML = `<div class="tv tv-wrap" id="tv"></div>`;
+  else if (S.view==='folj') v.innerHTML = `<div class="follow" id="follow"></div>`;
+  else if (S.view==='personal') v.innerHTML = staffHTML();
+  else { if (!S.draft){ S.draft = clone(cfg()); S.dirty = false; } v.innerHTML = settingsHTML(); }
+  renderData();
+  if (S.view==='terminal' && S.term.step==='done') renderQr();
+  if (S.view==='terminal' && S.term.step==='details') setTimeout(() => $('#t-name')?.focus(), 50);
+}
+function renderData(){
+  if (S.view==='terminal') updateTerminal();
+  else if (S.view==='skarm') updateTv();
+  else if (S.view==='folj') updateFollow();
+  else if (S.view==='personal') updateStaff();
+}
+
+/* ---------- Terminal ---------- */
+function terminalHTML(){
+  const T = S.term, b = brand(T.brand), p = b?.purposes.find(x => x.id===T.purpose);
+  const top = `<div class="t-top"><div class="logo"><i>K</i>Välkommen in</div><div class="clock num" data-clock></div></div>`;
+  let body = '';
+  if (T.step==='brand'){
+    body = `<div class="t-head"><h1>Vad gäller ditt besök?</h1><p>Tryck på det som passar dig. Du behöver ingen papperslapp, vi ropar ditt namn.</p></div>
+    <div class="t-brands">${brandsOn().map(b => `
+      <button class="t-brand" data-act="t-brand" data-id="${b.id}" style="${bvar(b)}">
+        <span class="t-mark">${esc(b.prefix)}</span>
+        <span class="t-brand-name">${esc(b.name)}</span>
+        <span class="t-brand-tag">${esc(b.tagline)}</span>
+        <span class="t-brand-list">${b.purposes.filter(p => p.enabled).map(p => esc(p.label)).join(' · ')}</span>
+        <span class="t-brand-q" data-q="${b.id}"></span>
+      </button>`).join('')}</div>`;
+  } else if (T.step==='purpose'){
+    body = `<button class="btn t-back" data-act="t-back">← Tillbaka</button>
+    <div class="t-head"><h1>${esc(b.name)}: vad ska du göra?</h1></div>
+    <div class="t-purposes">${b.purposes.filter(p => p.enabled).map(p => `
+      <button class="t-purpose" data-act="t-purpose" data-id="${p.id}" style="${bvar(b)}"><b>${esc(p.label)}</b><span>${esc(p.hint||'')}</span></button>`).join('')}</div>`;
+  } else if (T.step==='details'){
+    body = `<button class="btn t-back" data-act="t-back">← Tillbaka</button>
+    <div class="t-crumb"><span class="pill" style="${bvar(b)}"><span class="dot"></span>${esc(b.name)}</span><b>${esc(p?.label||'')}</b></div>
+    <div class="t-head"><h1>Vad heter du?</h1><p>Ditt namn visas på skärmen när det är din tur.</p></div>
+    <form class="t-form" id="t-form" autocomplete="off">
+      <div class="field"><label for="t-name">För- och efternamn</label>
+        <input class="input" id="t-name" maxlength="40" required autocapitalize="words" enterkeyhint="next" placeholder="Anna Andersson"></div>
+      <div class="field"><label for="t-phone">Mobilnummer</label>
+        <input class="input num" id="t-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" enterkeyhint="next" placeholder="070-123 45 67">
+        <span class="muted" style="font-size:16px">Vi använder numret om vi behöver nå dig under besöket. Numret raderas när besöket är klart.</span></div>
+      <div class="field"><label for="t-reg">Registreringsnummer <span class="muted">(valfritt)</span></label>
+        <input class="input num" id="t-reg" maxlength="7" autocapitalize="characters" enterkeyhint="done" placeholder="ABC 123" style="text-transform:uppercase;letter-spacing:.08em"></div>
+      <button class="btn primary" type="submit">Ställ mig i kö</button>
+    </form>`;
+  } else if (T.step==='done'){
+    const t = T.result, tb = brand(t.brand), tp = purposeOf(t);
+    const ahead = waiting(t.brand).filter(x => x.createdAt < t.createdAt).length;
+    body = `<div class="t-head"><h1>Klart, ${esc(t.name.split(' ')[0])}! Du står i kö.</h1></div>
+    <div class="t-done">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div class="t-ticket" style="${bvar(tb)};flex:1">
+        <span class="av av-xl">${esc(initials(t.name))}</span>
+        <span class="who">${esc(shortName(t.name))}</span>
+        <span class="label">Så här visas du på skärmen</span>
+        <span class="pill" style="${bvar(tb)};font-size:15px"><span class="dot"></span>${esc(tb.name)} · ${esc(tp?.label||'')}</span>
+      </div>
+      ${followOn() ? `<div class="t-qr-card">
+        <div class="qr" id="t-qr" role="img" aria-label="QR-kod: följ ditt ärende i mobilen"></div>
+        <div><b>Följ ditt ärende i mobilen</b><span class="muted">Skanna koden med mobilkameran – se din plats i kön och få en notis när det är din tur.</span></div>
+      </div>` : ''}
+      </div>
+      <div class="t-steps">
+        <div class="t-step"><i>1</i><div><b>${esc(tb.waitText || 'Ta plats i väntrummet')}</b><span class="muted">${ahead===0 ? 'Du är först i kön.' : `${ahead} före dig, ${waitLabel(estWait(t.brand, ahead))}.`}</span></div></div>
+        <div class="t-step"><i>2</i><div><b>Håll utkik på skärmen${followOn() ? ' eller i mobilen' : ''}</b><span class="muted">${followOn() ? 'Ditt namn visas med en ljudsignal, och mobilen plingar om du har skannat koden.' : 'Ditt namn visas med en ljudsignal när det är din tur.'}</span></div></div>
+        <div class="t-step"><i>3</i><div><b>Gå dit skärmen visar</b><span class="muted">${tp?.desk && desk(tp.desk) ? `Troligen ${esc(desk(tp.desk).name)}: ${esc(desk(tp.desk).location)}.` : 'Skärmen visar vilken disk du ska gå till.'}</span></div></div>
+        <div class="t-reset"><button class="btn" data-act="t-reset">Klar</button><span id="t-count"></span></div>
+      </div>
+    </div>`;
+  }
+  return `<div class="term">${top}${body}<div class="t-ticker" id="t-ticker"></div></div>`;
+}
+function updateTerminal(){
+  document.querySelectorAll('[data-q]').forEach(el => {
+    const n = waiting(el.dataset.q).length;
+    el.innerHTML = n ? `<span class="dot" style="${bvar(brand(el.dataset.q))}"></span>${n} väntar · ${waitLabel(estWait(el.dataset.q, n))}` : `<span class="dot" style="--b:var(--ok)"></span>Ingen kö just nu`;
+  });
+  const called = S.tickets.filter(t => t.status==='called').sort((a,b) => b.calledAt-a.calledAt).slice(0,4);
+  const tk = $('#t-ticker');
+  if (tk) tk.innerHTML = `<span class="label">Välkommen fram</span><div class="t-ticker-items">${called.length ? called.map(t => `<span><b>${esc(shortName(t.name))}</b>${dirOf(desk(t.desk))?.[0] || '→'} ${esc(desk(t.desk)?.name || '')}</span>`).join('') : '<span>Vi ropar snart nästa kund</span>'}</div>`;
+}
+function termGo(step){ S.term.step = step; S.term.resetAt = Date.now() + (step==='done' ? 45000 : 60000); renderView(); }
+async function termSubmit(e){
+  e.preventDefault();
+  const name = $('#t-name').value.trim().replace(/\s+/g,' ');
+  if (name.length < 2){ toast('Skriv ditt namn så vi kan ropa dig.'); $('#t-name').focus(); return; }
+  const reg = $('#t-reg').value.toUpperCase().replace(/[^A-ZÅÄÖ0-9]/g,'').slice(0,6);
+  const phone = normPhone($('#t-phone').value);
+  if (!phone){ toast(phone === '' ? 'Skriv ditt mobilnummer, till exempel 070-123 45 67.' : 'Kontrollera mobilnumret, till exempel 070-123 45 67.'); $('#t-phone').focus(); return; }
+  const t = { id:`${S.day}-${uid()}`, day:S.day, seq:nextSeq(S.term.brand), brand:S.term.brand, purpose:S.term.purpose,
+    name, regnr:reg, phone, status:'waiting', createdAt:Date.now(), source:'terminal' };
+  const btn = e.submitter; if (btn) btn.disabled = true;
+  if (await write(() => store.add(t))){ S.term.result = t; termGo('done'); }
+  else if (btn) btn.disabled = false;
+}
+function termReset(){ S.term = { step:'brand', brand:null, purpose:null, result:null, resetAt:0 }; renderView(); }
+
+/* ---------- Personal ---------- */
+function myBrands(){ return S.staff.brands || cfg().brands.map(b => b.id); }
+function staffHTML(){
+  const d = cfg().desks;
+  return `<div class="staff">
+    <aside class="console">
+      <div class="panel">
+        <div class="field"><label class="label" for="s-desk">Min station</label>
+          <select class="input" id="s-desk"><option value="">Välj station…</option>${d.map(x => `<option value="${x.id}" ${x.id===S.staff.desk?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+        <div class="field"><span class="label">Jag tar kunder från</span>
+          <div class="chips" id="s-chips">${cfg().brands.map(b => `<button class="chip" data-act="s-chip" data-id="${b.id}" style="${bvar(b)}" aria-pressed="${myBrands().includes(b.id)}"><span class="dot"></span>${esc(b.name)}</button>`).join('')}</div></div>
+        <button class="btn primary call-next" data-act="call-next" id="s-callnext">Ropa nästa kund</button>
+      </div>
+      <div id="s-current"></div>
+      <details class="panel" id="s-add-wrap">
+        <summary>Lägg till kund manuellt</summary>
+        <form id="s-add" class="field" style="gap:10px" autocomplete="off">
+          <input class="input" id="a-name" placeholder="Namn" maxlength="40" required>
+          <div class="grid2">
+            <select class="input" id="a-brand">${cfg().brands.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select>
+            <select class="input" id="a-purpose"></select>
+          </div>
+          <input class="input" id="a-phone" type="tel" inputmode="tel" placeholder="Mobilnummer (valfritt)" maxlength="16">
+          <input class="input" id="a-reg" placeholder="Reg.nr (valfritt)" maxlength="7" style="text-transform:uppercase">
+          <button class="btn" type="submit">Lägg i kön</button>
+        </form>
+      </details>
+    </aside>
+    <section class="board">
+      <div class="stats" id="s-stats"></div>
+      <div class="seg" role="tablist" id="s-tabs"></div>
+      <div class="list" id="s-list"></div>
+    </section>
+  </div>`;
+}
+function fillPurposeSelect(){
+  const b = brand($('#a-brand')?.value); const sel = $('#a-purpose');
+  if (b && sel) sel.innerHTML = b.purposes.filter(p => p.enabled).map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('');
+}
+function updateStaff(){
+  if (!$('#s-stats')) return;
+  if ($('#a-purpose') && !$('#a-purpose').options.length) fillPurposeSelect();
+  const now = Date.now();
+  $('#s-stats').innerHTML = cfg().brands.map(b => {
+    const w = waiting(b.id), longest = w.length ? mins(now - w[0].createdAt) : 0;
+    const served = S.tickets.filter(t => t.brand===b.id && t.status==='done').length;
+    return `<div class="stat" style="${bvar(b)}"><div class="head"><span class="dot"></span>${esc(b.name)}</div>
+      <div class="v num">${w.length}<span class="s"> väntar</span></div>
+      <div class="s">${w.length ? `Längst ${longest} min · ` : ''}${served} klara idag · snitt ${Math.round(avgService(b.id))} min</div></div>`;
+  }).join('');
+
+  const mine = S.tickets.filter(t => t.desk===S.staff.desk && S.staff.desk && ['called','serving'].includes(t.status)).sort((a,b) => b.calledAt-a.calledAt);
+  $('#s-current').innerHTML = !S.staff.desk ? `<div class="empty">Välj din station för att börja ropa kunder.</div>`
+    : mine.length ? mine.map(t => currentCard(t)).join('') : `<div class="empty">Ingen kund vid ${esc(desk(S.staff.desk)?.name||'')} just nu.</div>`;
+  $('#s-callnext').disabled = !S.staff.desk;
+
+  const groups = { waiting:['waiting'], active:['called','serving'], done:['done','noshow'] };
+  const counts = Object.fromEntries(Object.entries(groups).map(([k,v]) => [k, S.tickets.filter(t => v.includes(t.status)).length]));
+  const tabs = { waiting:'Väntar', active:'Ropade & pågår', done:'Klara' };
+  $('#s-tabs').innerHTML = Object.entries(tabs).map(([k,l]) => `<button role="tab" aria-selected="${S.staff.tab===k}" data-act="s-tab" data-id="${k}">${l}<span class="c">${counts[k]}</span></button>`).join('');
+
+  let rows = S.tickets.filter(t => groups[S.staff.tab].includes(t.status));
+  rows.sort(S.staff.tab==='waiting' ? (a,b) => a.createdAt-b.createdAt : (a,b) => (b.doneAt||b.calledAt||0)-(a.doneAt||a.calledAt||0));
+  $('#s-list').innerHTML = !S.loaded && !rows.length ? `<div class="empty">Hämtar kön…</div>`
+    : rows.length ? rows.map(rowHTML).join('')
+    : `<div class="empty">${S.staff.tab==='waiting' ? 'Ingen väntar. Kunder som checkar in på terminalen dyker upp här direkt.' : S.staff.tab==='active' ? 'Ingen är ropad just nu.' : 'Inga avslutade besök idag än.'}</div>`;
+}
+function currentCard(t){
+  const b = brand(t.brand), p = purposeOf(t);
+  return `<div class="current" style="${bvar(b)}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="av">${esc(initials(t.name))}</span><span class="pill" style="${t.status==='serving'?'--b:var(--ok)':bvar(b)}">${STATUS[t.status]}${t.status==='called' && (t.callCount||1)>1 ? ` ×${t.callCount}`:''}</span></div>
+    <div class="nm">${esc(t.name)}</div>
+    <div class="muted">${esc(b?.name||'')} · ${esc(p?.label||'')}${t.regnr ? ` · <span class="reg">${esc(t.regnr)}</span>`:''}${t.phone ? ` · <span style="white-space:nowrap">${fmtPhone(t.phone)}</span>` : ''}</div>
+    <div class="muted" style="font-size:14px">Väntade ${mins((t.calledAt||Date.now()) - t.createdAt)} min · ropad ${clock(t.calledAt)}</div>
+    ${t.status==='called' ? `<div class="muted" style="font-size:14px">På skärmen: ”${esc(callText(t))}”</div>` : ''}
+    <div class="btn-row">${t.status==='called'
+      ? `<button class="btn primary sm" data-act="serve" data-id="${t.id}">Kunden är här</button><button class="btn sm" data-act="recall" data-id="${t.id}">Ropa igen</button><button class="btn sm danger" data-act="noshow" data-id="${t.id}">Kom ej</button>`
+      : `<button class="btn primary sm" data-act="done" data-id="${t.id}">Avsluta besök</button>`}
+      <button class="btn sm ghost" data-act="transfer" data-id="${t.id}">Flytta…</button></div>
+    ${S.staff.transferId===t.id ? transferHTML(t) : ''}
+  </div>`;
+}
+function rowHTML(t){
+  const b = brand(t.brand), p = purposeOf(t), w = mins((t.status==='waiting' ? Date.now() : (t.calledAt||Date.now())) - t.createdAt);
+  let acts = '';
+  if (t.status==='waiting') acts = `<button class="btn sm primary" data-act="call" data-id="${t.id}" ${S.staff.desk?'':'disabled'}>Ropa</button><button class="btn sm ghost" data-act="transfer" data-id="${t.id}">Flytta</button>`;
+  else if (t.status==='called') acts = `<button class="btn sm" data-act="recall" data-id="${t.id}">Ropa igen</button><button class="btn sm" data-act="serve" data-id="${t.id}">Här</button>`;
+  else if (t.status==='serving') acts = `<button class="btn sm" data-act="done" data-id="${t.id}">Avsluta</button>`;
+  else if (t.status==='noshow') acts = `<button class="btn sm" data-act="requeue" data-id="${t.id}">Tillbaka i kö</button>`;
+  return `<div class="row" style="${bvar(b)}">
+    <span class="av">${esc(initials(t.name))}</span>
+    <div style="min-width:0"><div class="nm">${esc(t.name)} ${t.demo?'<span class="pill">Exempel</span>':''}</div><div class="sub">${t.regnr?`<span class="reg">${esc(t.regnr)}</span> `:''}${t.source==='staff'?'Manuellt tillagd':'Terminal'} ${clock(t.createdAt)}</div></div>
+    <div class="pcol" style="min-width:0"><div>${esc(p?.label||t.purpose)}</div><div class="sub">${t.status==='waiting' ? esc(b?.name||'') : `${STATUS[t.status]}${t.desk?' · '+esc(desk(t.desk)?.name||''):''}`}</div></div>
+    <span class="wait ${t.status==='waiting' && w>=20?'long':''}">${w} min</span>
+    <div class="acts">${acts}</div>
+    ${S.staff.transferId===t.id ? transferHTML(t) : ''}
+  </div>`;
+}
+function transferHTML(t){
+  return `<div class="transfer"><select class="input" id="tr-${t.id}">${cfg().brands.map(b => `<optgroup label="${esc(b.name)}">${b.purposes.filter(p => p.enabled).map(p => `<option value="${b.id}|${p.id}" ${b.id===t.brand&&p.id===t.purpose?'selected':''}>${esc(b.name)}: ${esc(p.label)}</option>`).join('')}</optgroup>`).join('')}</select>
+    <button class="btn sm primary" data-act="transfer-go" data-id="${t.id}">Flytta och behåll plats</button><button class="btn sm ghost" data-act="transfer" data-id="${t.id}">Avbryt</button></div>`;
+}
+const T = id => S.tickets.find(t => t.id===id);
+async function callTicket(t){
+  if (!S.staff.desk){ toast('Välj din station först.'); return; }
+  const ok = await write(() => store.update(t.id, { status:'called', desk:S.staff.desk, calledAt:Date.now(), callCount:(t.callCount||0)+1 }), `${shortName(t.name)} ropas till ${desk(S.staff.desk)?.name}`);
+}
+
+/* ---------- Telefonnummer ---------- */
+function normPhone(v){
+  let d = String(v||'').trim();
+  const plus = d.startsWith('+');
+  d = d.replace(/\D/g,'');
+  if (!d) return '';
+  if (!plus){ if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '46' + d.slice(1); }
+  return d.length >= 10 && d.length <= 15 ? d : null;
+}
+function fmtPhone(p){
+  const d = String(p||'');
+  if (!d.startsWith('46')) return '+' + d;
+  const l = '0' + d.slice(2);
+  return l.length === 10 ? `${l.slice(0,3)}-${l.slice(3,6)} ${l.slice(6,8)} ${l.slice(8)}` : l;
+}
+
+/* ---------- Följ i mobilen ---------- */
+const followOn = () => cfg().follow?.enabled !== false;
+function followLink(id, base){
+  base = String(base ?? cfg().follow?.url ?? '').trim() || location.href.split('#')[0];
+  return base.split('#')[0] + '#folj=' + encodeURIComponent(id);
+}
+function renderQr(){
+  const el = $('#t-qr'); if (!el || !S.term.result) return;
+  const url = followLink(S.term.result.id);
+  el.innerHTML = '';
+  if (window.QRCode) new QRCode(el, { text:url, width:124, height:124, colorDark:'#16212C', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+  else el.innerHTML = `<span class="muted" style="font-size:11px;overflow-wrap:anywhere;max-width:140px;display:block">${esc(url)}</span>`;
+}
+function notifyFollow(t){
+  try { navigator.vibrate?.([300,150,300,150,300]); } catch {}
+  chime();
+  if (S.notify && window.Notification?.permission === 'granted'){
+    try {
+      const d = desk(t.desk);
+      new Notification('Grönt ljus – det är din tur!', { body:`${callText(t, 'first')}${d?.location ? '. ' + d.location : ''}.`, tag:'kokortet-'+t.id, renotify:true });
+    } catch {}
+  }
+}
+function updateFollow(){
+  const el = $('#follow'); if (!el) return;
+  const head = `<div class="f-top"><div class="logo"><i>K</i>Kökortet</div><span class="clock num" data-clock></span></div>`;
+  const t = S.tickets.find(x => x.id === S.followId);
+  if (!t){
+    const offline = store && !store.live;
+    el.innerHTML = head + `<div class="empty" style="padding:44px 20px">${
+      offline ? 'Mobilen kunde inte ansluta till kön. Håll utkik på skärmen i väntrummet – där visas ditt namn när det är din tur.'
+      : S.loaded ? 'Vi hittar inte ditt ärende. Det kan vara avslutat eller gälla en annan dag – fråga gärna personalen.'
+      : 'Hämtar ditt ärende…'}</div>`;
+    tickClock(); return;
+  }
+  const b = brand(t.brand), p = purposeOf(t), d = desk(t.desk), dr = dirOf(d);
+  const ahead = waiting(t.brand).filter(x => x.createdAt < t.createdAt).length;
+  let card;
+  if (t.status === 'waiting'){
+    card = `<div class="f-card" style="${bvar(b)}"><span class="label">Din plats i kön</span>
+      ${ahead === 0 ? `<span class="f-big" style="color:var(--b)">Näst på tur</span><span class="muted">Du ropas som nästa kund.</span>`
+        : `<span class="f-pos num">${ahead}</span><span class="muted">${ahead === 1 ? '1 kund' : ahead + ' kunder'} före dig · ${waitLabel(estWait(t.brand, ahead))}</span>`}
+      <span class="muted">${esc(b?.waitText || 'Ta plats i väntrummet')}. Den här sidan säger till när det är din tur.</span></div>`;
+  } else if (t.status === 'called'){
+    card = `<div class="f-card called" style="--b:var(--ok)"><span class="label gl-label"><span class="gl"></span>Det är din tur${(t.callCount||1) > 1 ? ' – vi ropar igen' : ''}!</span>
+      <span class="f-big f-call">${callText(t, 'first', true)}</span>
+      ${d?.location ? `<span class="muted" style="font-size:18px">${esc(d.location)}</span>` : ''}
+      ${dr ? `<span class="dir" role="img" aria-label="${dr[1]}">${dr[0]}</span>` : ''}</div>`;
+  } else if (t.status === 'serving'){
+    card = `<div class="f-card" style="--b:var(--ok)"><span class="label" style="color:var(--ok)">Pågår</span><span class="f-big">Du betjänas nu</span><span class="muted">${d ? `Vid ${esc(d.name)}. ` : ''}Trevligt besök!</span></div>`;
+  } else if (t.status === 'noshow'){
+    card = `<div class="f-card" style="--b:var(--warn)"><span class="label" style="color:var(--warn)">Vi ropade dig</span><span class="f-big">Vi fick inget svar</span><span class="muted">Gå fram till disken eller säg till personalen, så hjälper vi dig direkt.</span></div>`;
+  } else {
+    card = `<div class="f-card" style="--b:var(--ok)"><span class="f-big">Tack för besöket!</span><span class="muted">Ditt ärende är avslutat. Välkommen åter.</span></div>`;
+  }
+  const notis = !['waiting','called'].includes(t.status) ? ''
+    : S.alerts
+      ? `<div class="f-note"><span class="dot" style="--b:var(--ok)"></span>${S.notify ? 'Notis, ljud och vibration är på' : 'Ljud och vibration är på'} – håll sidan öppen</div>`
+      : `<button class="btn primary" data-act="f-notify" style="min-height:54px;font-size:17px">Säg till mig när det är min tur</button>
+         <span class="muted" style="font-size:13px;text-align:center">Mobilen plingar och vibrerar när du ropas, så länge sidan är öppen.</span>`;
+  el.innerHTML = head + `
+    <div class="f-card f-id" style="${bvar(b)}">
+      <span class="av">${esc(initials(t.name))}</span>
+      <div style="min-width:0"><div style="font-weight:700">${esc(t.name)}</div>
+      <div class="muted" style="font-size:14px">${esc(b?.name || '')} · ${esc(p?.label || t.purpose)}${t.regnr ? ` · <span class="reg">${esc(t.regnr)}</span>` : ''}</div></div>
+    </div>
+    ${card}${notis}
+    <span class="muted" style="font-size:13px;text-align:center">Sidan uppdateras automatiskt · incheckad ${clock(t.createdAt)}</span>`;
+  tickClock();
+}
+
+/* ---------- Skärm ---------- */
+function updateTv(){
+  const el = $('#tv'); if (!el) return;
+  const called = S.tickets.filter(t => t.status==='called').sort((a,b) => b.calledAt-a.calledAt).slice(0,6);
+  const fresh = S.justCalled || new Set(); S.justCalled = null;
+  el.innerHTML = `
+    <div class="tv-head"><div><span class="label">${greet()} · ${esc(new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long'}))}</span><h1>Välkommen fram</h1></div><span class="clock num" data-clock></span></div>
+    <div class="tv-calls">${called.length ? called.map(t => { const d = desk(t.desk), b = brand(t.brand), p = purposeOf(t), dr = dirOf(d); return `
+      <div class="tv-call ${fresh.has(t.id)?'new':''}" style="${bvar(b)}">
+        <span class="av">${esc(initials(t.name))}</span>
+        <span class="nm"><span class="hi"><span class="gl"></span>${esc(b?.name || '')}${p ? ' · ' + esc(p.label) : ''}</span>${callText(t, 'screen', true)}</span>
+        <span class="to">${d?.location ? `<span>${esc(d.location)}</span>` : ''}${dr ? `<span class="dir" role="img" aria-label="${dr[1]}">${dr[0]}</span>` : ''}</span>
+      </div>`; }).join('') : `<div class="tv-empty">Vi ropar snart nästa kund.<br>Ta gärna en kopp kaffe så länge.</div>`}</div>
+    <div class="tv-side">${brandsOn().map(b => { const n = waiting(b.id).length; return `
+      <div class="tv-q" style="${bvar(b)}"><div class="top"><h3>${esc(b.name)}</h3><span class="v num">${n}</span></div>
+      <span class="s">${esc(b.tagline)} · ${n ? `${n} i kö, ${waitLabel(estWait(b.id, n))}` : 'ingen kö'}</span></div>`; }).join('')}</div>
+    <div class="tv-msg"><span>${esc(cfg().screenMessage||'')}</span>${S.sound ? '<span>Ljud på</span>' : '<button class="btn" data-act="sound">Slå på ljud och uppläsning</button>'}</div>`;
+  tickClock();
+}
+
+/* ---------- Inställningar ---------- */
+function settingsHTML(){
+  const c = S.draft, base = location.href.split('#')[0];
+  const deskOpts = sel => `<option value="">Ingen förvald</option>` + c.desks.map(d => `<option value="${d.id}" ${d.id===sel?'selected':''}>${esc(d.name)}</option>`).join('');
+  return `<div class="settings">
+    <div><h2>Inställningar</h2><p class="set-intro">Ändringar gäller alla terminaler, skärmar och personalvyer direkt när du sparar. Syften du stänger av försvinner från terminalen men befintliga biljetter påverkas inte.</p></div>
+    <div class="links">${[['terminal','Terminal','För iPaden vid entrén'],['skarm','Väntrumsskärm','För TV:n i loungen'],['personal','Personal','För disk och verkstad']].map(([h,t,s]) => `<a href="#${h}"><b>${t}</b><span class="muted">${s}</span><br><span class="muted" style="font-size:12px;overflow-wrap:anywhere">${esc(base)}#${h}</span></a>`).join('')}</div>
+    ${c.brands.map((b,i) => `
+    <section class="brand-card" style="${bvar(b)}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>${esc(b.name)}</h2>
+        <label style="display:flex;gap:10px;align-items:center;font-weight:600">Visas på terminalen <span class="toggle"><input type="checkbox" data-k="brands.${i}.enabled" ${b.enabled!==false?'checked':''}><span></span></span></label></div>
+      <div class="f-grid">
+        <div class="field"><label class="label" for="b${i}n">Namn</label><input class="input" id="b${i}n" data-k="brands.${i}.name" value="${esc(b.name)}"></div>
+        <div class="field"><label class="label" for="b${i}t">Undertext</label><input class="input" id="b${i}t" data-k="brands.${i}.tagline" value="${esc(b.tagline)}"></div>
+        <div class="field"><label class="label" for="b${i}p">Bokstav på knappen</label><input class="input" id="b${i}p" data-k="brands.${i}.prefix" maxlength="2" value="${esc(b.prefix)}"></div>
+        <div class="field"><label class="label" for="b${i}c">Färg</label><select class="input" id="b${i}c" data-k="brands.${i}.color" data-rerender>${Object.entries(COLORS).map(([k,l]) => `<option value="${k}" ${k===b.color?'selected':''}>${l}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label class="label" for="b${i}w">Var kunden väntar</label><input class="input" id="b${i}w" data-k="brands.${i}.waitText" value="${esc(b.waitText||'')}"></div>
+      <div class="field"><span class="label">Syften</span>
+        <div class="p-row p-head"><span>Knapptext</span><span>Förklaring</span><span>Förvald disk</span><span>På</span><span></span></div>
+        ${b.purposes.map((p,j) => `<div class="p-row">
+          <input class="input" aria-label="Knapptext" data-k="brands.${i}.purposes.${j}.label" value="${esc(p.label)}">
+          <input class="input p-hint" aria-label="Förklaring" data-k="brands.${i}.purposes.${j}.hint" value="${esc(p.hint||'')}">
+          <select class="input p-desk" aria-label="Förvald disk" data-k="brands.${i}.purposes.${j}.desk">${deskOpts(p.desk)}</select>
+          <span class="toggle"><input type="checkbox" aria-label="Visa ${esc(p.label)}" data-k="brands.${i}.purposes.${j}.enabled" ${p.enabled?'checked':''}><span></span></span>
+          <button class="btn sm ghost danger" data-act="p-del" data-b="${i}" data-p="${j}" aria-label="Ta bort ${esc(p.label)}">Ta bort</button>
+        </div>`).join('')}
+        <div><button class="btn sm" data-act="p-add" data-b="${i}">+ Lägg till syfte</button></div>
+      </div>
+    </section>`).join('')}
+    <section class="panel">
+      <h2>Stationer och diskar</h2>
+      <p class="set-intro" style="margin:0">Platsbeskrivningen och pilen visas på väntrumsskärmen så kunden vet vart den ska gå.</p>
+      ${c.desks.map((d,i) => `<div class="d-row">
+        <input class="input" aria-label="Namn" data-k="desks.${i}.name" value="${esc(d.name)}">
+        <input class="input d-loc" aria-label="Platsbeskrivning" data-k="desks.${i}.location" value="${esc(d.location)}">
+        <select class="input d-dir" aria-label="Pil på skärmen" data-k="desks.${i}.dir"><option value="">Ingen pil</option>${Object.entries(DIRS).map(([k,[a,l]]) => `<option value="${k}" ${d.dir===k?'selected':''}>${a} ${l.charAt(0).toUpperCase()+l.slice(1)}</option>`).join('')}</select>
+        <button class="btn sm ghost danger" data-act="d-del" data-i="${i}">Ta bort</button></div>`).join('')}
+      <div><button class="btn sm" data-act="d-add">+ Lägg till station</button></div>
+    </section>
+    <section class="panel">
+      <h2>När kunden ropas</h2>
+      <p class="set-intro" style="margin:0">Inropningstexten visas på väntrumsskärmen och i kundens mobil, och läses upp. Du kan använda {halsning}, {namn}, {disk}, {plats} och {foretag}. Namnet och disken lyfts fram, disken i grönt.</p>
+      <div class="field"><label class="label" for="ct">Inropningstext</label><input class="input" id="ct" data-k="callText" maxlength="160" value="${esc(c.callText || '')}">
+        <span class="muted" style="font-size:13px">Till exempel: <span id="ct-prev">${esc(callPreview(c))}</span></span></div>
+      <p class="set-intro" style="margin:0"><b>{halsning}</b> väljs efter hur länge kunden har väntat:</p>
+      ${(c.greetings || []).map((g,i) => `<div class="g-row">
+        <label class="g-max">Upp till <input class="input num" type="number" min="0" max="240" aria-label="Antal minuter" data-k="greetings.${i}.upTo" value="${esc(g.upTo)}"> min</label>
+        <input class="input" aria-label="Hälsning" data-k="greetings.${i}.text" value="${esc(g.text)}">
+        <button class="btn sm ghost danger" data-act="g-del" data-i="${i}">Ta bort</button></div>`).join('')}
+      <div class="g-row"><span class="g-max">Längre väntan</span>
+        <input class="input" aria-label="Hälsning vid längre väntan" data-k="greetingLong" value="${esc(c.greetingLong || '')}"><span></span></div>
+      <div><button class="btn sm" data-act="g-add">+ Lägg till nivå</button></div>
+    </section>
+    <section class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>Följ i mobilen</h2>
+        <label style="display:flex;gap:10px;align-items:center;font-weight:600">Visa QR-kod efter incheckning <span class="toggle"><input type="checkbox" data-k="follow.enabled" ${c.follow?.enabled!==false?'checked':''}><span></span></span></label></div>
+      <p class="set-intro" style="margin:0">Efter incheckningen visar terminalen en QR-kod. Kunden skannar den och ser sin plats i kön, beräknad väntetid och vart den ska gå. När personalen ropar plingar och vibrerar mobilen, och en notis visas om kunden har tillåtit det.</p>
+      <div class="field"><label class="label" for="fu">Länk i QR-koden <span class="muted">(valfritt)</span></label><input class="input" id="fu" data-k="follow.url" placeholder="Lämna tomt för att använda sidans egen adress" value="${esc(c.follow?.url||'')}">
+        <span class="muted" style="font-size:13px;overflow-wrap:anywhere">Kundens ärende läggs till på slutet, till exempel ${esc(followLink(S.day + '-abc123', c.follow?.url))}</span></div>
+    </section>
+    <section class="panel">
+      <h2>Skärm och integritet</h2>
+      <div class="f-grid">
+        <div class="field"><label class="label" for="nf">Namn på skärmen</label><select class="input" id="nf" data-k="nameFormat"><option value="short" ${c.nameFormat!=='full'?'selected':''}>Förnamn + initial (Anna S.)</option><option value="full" ${c.nameFormat==='full'?'selected':''}>Fullständigt namn</option></select></div>
+        <div class="field"><label class="label" for="rd">Radera biljetter efter (dagar)</label><input class="input" id="rd" type="number" min="1" max="365" data-k="retentionDays" value="${c.retentionDays||30}"></div>
+      </div>
+      <div class="field"><label class="label" for="sm">Meddelande på väntrumsskärmen</label><input class="input" id="sm" data-k="screenMessage" value="${esc(c.screenMessage||'')}"></div>
+    </section>
+    <section class="panel">
+      <h2>Dagens kö</h2>
+      <div class="btn-row">
+        <button class="btn" data-act="demo">Fyll kön med exempelkunder</button>
+        ${S.staff.confirmClear ? `<button class="btn danger" data-act="clear-yes">Ja, töm dagens kö</button><button class="btn ghost" data-act="clear-no">Avbryt</button>` : `<button class="btn danger" data-act="clear">Töm dagens kö…</button>`}
+      </div>
+    </section>
+  </div>
+  <div class="savebar"><span class="muted" id="dirty">${S.dirty ? 'Osparade ändringar' : 'Allt sparat'}</span><button class="btn" data-act="s-revert" ${S.dirty?'':'disabled'}>Ångra</button><button class="btn primary" data-act="s-save" ${S.dirty?'':'disabled'}>Spara ändringar</button></div>`;
+}
+function callPreview(c){
+  const d = c.desks[1] || c.desks[0];
+  const v = { halsning:trimEnd(c.greetings?.[0]?.text || c.greetingLong || ''), namn:c.nameFormat === 'full' ? 'Robert Svensson' : 'Robert S.', disk:d?.name || 'disken', plats:d?.location || '', foretag:c.brands[0]?.name || '' };
+  const s = String(c.callText || '').replace(/\{(\w+)\}/g, (m,k) => k in v ? v[k] : m).replace(/\s+/g,' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function setPath(obj, path, val){
+  const k = path.split('.'); let o = obj;
+  for (let i=0;i<k.length-1;i++) o = o[k[i]];
+  o[k[k.length-1]] = val;
+}
+function markDirty(){ S.dirty = true; $('#dirty').textContent = 'Osparade ändringar'; document.querySelectorAll('[data-act="s-save"],[data-act="s-revert"]').forEach(b => b.disabled = false); }
+function slug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,'').slice(0,16) || 'syfte'; }
+
+/* ---------- Events ---------- */
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, id = el.dataset.id, t = id && T(id);
+  switch(a){
+    case 't-brand': {
+      S.term.brand = id; const ps = brand(id).purposes.filter(p => p.enabled);
+      if (ps.length === 1){ S.term.purpose = ps[0].id; termGo('details'); } else termGo('purpose');
+      break; }
+    case 't-purpose': S.term.purpose = id; termGo('details'); break;
+    case 't-back': {
+      const one = brand(S.term.brand)?.purposes.filter(p => p.enabled).length === 1;
+      termGo(S.term.step==='details' && !one ? 'purpose' : 'brand'); break; }
+    case 't-reset': termReset(); break;
+    case 's-chip': {
+      const set = new Set(myBrands()); set.has(id) ? set.delete(id) : set.add(id);
+      S.staff.brands = [...set]; ls.set('brands', S.staff.brands); el.setAttribute('aria-pressed', set.has(id)); break; }
+    case 'call-next': {
+      const next = waiting().filter(x => myBrands().includes(x.brand))[0];
+      if (!next){ toast('Ingen väntar i dina köer just nu.'); break; }
+      await callTicket(next); break; }
+    case 'call': case 'recall': if (t) await callTicket(t); break;
+    case 'serve': await write(() => store.update(id, { status:'serving', servedAt:Date.now() })); break;
+    case 'done': await write(() => store.update(id, { status:'done', doneAt:Date.now(), phone:'' }), 'Besöket är avslutat'); break;
+    case 'noshow': await write(() => store.update(id, { status:'noshow', doneAt:Date.now() }), 'Markerad som ej på plats. Du hittar kunden under Klara.'); break;
+    case 'requeue': await write(() => store.update(id, { status:'waiting', desk:'' }), 'Kunden står i kön igen'); break;
+    case 's-tab': S.staff.tab = id; S.staff.transferId = null; updateStaff(); break;
+    case 'transfer': S.staff.transferId = S.staff.transferId===id ? null : id; updateStaff(); break;
+    case 'transfer-go': {
+      const [b, p] = $('#tr-'+id).value.split('|');
+      S.staff.transferId = null;
+      await write(() => store.update(id, { brand:b, purpose:p, status:'waiting', desk:'' }), `Flyttad till ${brand(b)?.name}, platsen i kön behålls`); break; }
+    case 'sound': {
+      try { S.audio = new (window.AudioContext || window.webkitAudioContext)(); S.sound = true; chime(); } catch { toast('Ljud stöds inte på den här skärmen.'); }
+      updateTv(); break; }
+    case 'f-notify': {
+      try { S.audio = S.audio || new (window.AudioContext || window.webkitAudioContext)(); S.audio.resume?.(); } catch {}
+      S.alerts = true;
+      if ('Notification' in window){
+        let perm = 'denied';
+        try { perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); } catch {}
+        S.notify = perm === 'granted';
+      }
+      chime();
+      toast(S.notify ? 'Klart – mobilen säger till när det är din tur.' : 'Klart – håll sidan öppen så plingar mobilen när det är din tur.');
+      updateFollow(); break; }
+    case 'p-add': { const b = S.draft.brands[el.dataset.b]; b.purposes.push({ id:'nytt'+uid(), label:'Nytt syfte', hint:'', enabled:true, desk:'' }); markDirty(); renderView(); break; }
+    case 'p-del': S.draft.brands[el.dataset.b].purposes.splice(el.dataset.p, 1); markDirty(); renderView(); break;
+    case 'd-add': S.draft.desks.push({ id:'s'+uid(), name:'Ny station', location:'', dir:'' }); markDirty(); renderView(); break;
+    case 'g-add': {
+      const g = S.draft.greetings || (S.draft.greetings = []);
+      g.push({ upTo:(g.length ? (parseInt(g[g.length-1].upTo) || 0) : 0) + 10, text:'Ny hälsning' }); markDirty(); renderView(); break; }
+    case 'g-del': S.draft.greetings.splice(el.dataset.i, 1); markDirty(); renderView(); break;
+    case 'd-del': S.draft.desks.splice(el.dataset.i, 1); markDirty(); renderView(); break;
+    case 's-revert': S.draft = clone(cfg()); S.dirty = false; renderView(); break;
+    case 's-save': {
+      const c = S.draft;
+      c.brands.forEach(b => { b.prefix = (b.prefix||'').toUpperCase().trim() || b.name[0].toUpperCase(); b.purposes.forEach(p => { if (p.id.startsWith('nytt')) p.id = slug(p.label) + '-' + uid().slice(0,3); }); });
+      c.retentionDays = Math.max(1, Math.min(365, parseInt(c.retentionDays) || 30));
+      c.callText = String(c.callText || '').trim() || DEFAULT_CONFIG.callText;
+      c.greetings = (c.greetings || []).map(g => ({ upTo:Math.max(0, parseInt(g.upTo) || 0), text:String(g.text || '').trim() })).filter(g => g.text).sort((a,b) => a.upTo-b.upTo);
+      if (await write(() => store.saveConfig(c), 'Inställningarna är sparade')){ S.cfg = clone(c); S.draft = clone(c); S.dirty = false; renderView(); }
+      break; }
+    case 'demo': await addDemo(); break;
+    case 'clear': S.staff.confirmClear = true; renderView(); break;
+    case 'clear-no': S.staff.confirmClear = false; renderView(); break;
+    case 'clear-yes': {
+      S.staff.confirmClear = false;
+      const ids = S.tickets.map(t => t.id);
+      await write(async () => { for (const i of ids) await store.remove(i); }, `${ids.length} biljetter borttagna`);
+      renderView(); break; }
+    case 'logout': {
+      try { await firebase.auth().signOut(); toast('Du är utloggad'); } catch { toast('Kunde inte logga ut. Försök igen.'); }
+      break; }
+  }
+});
+const AUTH_ERR = {
+  'auth/invalid-credential':'Fel lösenord.', 'auth/wrong-password':'Fel lösenord.', 'auth/invalid-login-credentials':'Fel lösenord.',
+  'auth/user-not-found':`Personalkontot ${STAFF_EMAIL} finns inte i Firebase. Lägg till det under Authentication → Users.`,
+  'auth/too-many-requests':'För många försök. Vänta en stund och försök igen.',
+  'auth/network-request-failed':'Ingen anslutning. Kontrollera nätverket och försök igen.',
+  'auth/operation-not-allowed':'Inloggning med e-post och lösenord är inte påslaget i Firebase (Authentication → Sign-in method).',
+  'auth/unauthorized-domain':'Den här webbadressen är inte godkänd i Firebase (Authentication → Settings → Authorized domains).'
+};
+document.addEventListener('input', e => {
+  const k = e.target.dataset?.k; if (!k || !S.draft) return;
+  setPath(S.draft, k, e.target.type==='checkbox' ? e.target.checked : e.target.value);
+  markDirty();
+  if (/^(callText|greetings|desks|nameFormat)/.test(k) && $('#ct-prev')) $('#ct-prev').textContent = callPreview(S.draft);
+  if (e.target.hasAttribute('data-rerender')) renderView();
+});
+document.addEventListener('change', e => {
+  if (e.target.id==='s-desk'){ S.staff.desk = e.target.value; ls.set('desk', S.staff.desk); updateStaff(); }
+  if (e.target.id==='a-brand') fillPurposeSelect();
+});
+document.addEventListener('submit', async e => {
+  if (e.target.id==='t-form') return termSubmit(e);
+  if (e.target.id==='lg-form'){
+    e.preventDefault();
+    const btn = e.submitter || $('#lg-form button'); btn.disabled = true;
+    try { await firebase.auth().signInWithEmailAndPassword(STAFF_EMAIL, $('#lg-pw').value); }
+    catch(err){ toast(AUTH_ERR[err?.code] || 'Kunde inte logga in. Försök igen.'); btn.disabled = false; $('#lg-pw')?.select(); }
+    return;
+  }
+  if (e.target.id==='s-add'){
+    e.preventDefault();
+    const name = $('#a-name').value.trim(); if (name.length < 2) return;
+    const b = $('#a-brand').value, phone = normPhone($('#a-phone').value);
+    if (phone === null){ toast('Kontrollera mobilnumret, till exempel 070-123 45 67.'); $('#a-phone').focus(); return; }
+    const t = { id:`${S.day}-${uid()}`, day:S.day, seq:nextSeq(b), brand:b, purpose:$('#a-purpose').value, name, phone,
+      regnr:$('#a-reg').value.toUpperCase().replace(/[^A-ZÅÄÖ0-9]/g,'').slice(0,6), status:'waiting', createdAt:Date.now(), source:'staff' };
+    if (await write(() => store.add(t), `${name} är tillagd i kön`)){ $('#a-name').value=''; $('#a-phone').value=''; $('#a-reg').value=''; }
+  }
+});
+async function addDemo(){
+  const names = ['Anna Svensson','Johan Lind','Fatima Rahimi','Erik Nilsson','Maria Holm','Ali Karimi','Sara Ek'];
+  const plan = [['kvdbil','hamta'],['autoexperten','inlamning'],['kvdbil','provkor'],['carglass','inlamning'],['kvdbil','lamna'],['autoexperten','upphamtning'],['kvdbil','ovrigt']];
+  const now = Date.now(), seqs = {};
+  await write(async () => {
+    for (let i=0;i<names.length;i++){
+      const [b,p] = plan[i]; seqs[b] = (seqs[b] || nextSeq(b) - 1) + 1;
+      const bp = brand(b)?.purposes.find(x => x.id===p) ? p : brand(b)?.purposes[0]?.id;
+      const t = { id:`${S.day}-${uid()}`, day:S.day, seq:seqs[b], brand:b, purpose:bp, name:names[i], regnr:i%2?'':['ABC123','MLK42X','GHT771','RPO55B'][i/2|0],
+        status:'waiting', createdAt:now - (names.length-i)*3*60000, source:'terminal', demo:true };
+      if (i===0) Object.assign(t, { status:'called', desk:'u1', calledAt:now - 60000, callCount:1 });
+      await store.add(t);
+    }
+  }, 'Sju exempelkunder är tillagda');
+}
+
+/* kiosk escape: hold the corner for a second to reveal the staff menu */
+(() => {
+  const k = $('#kiosk-key'); let timer;
+  const stop = () => { clearTimeout(timer); k.classList.remove('holding'); };
+  k.addEventListener('pointerdown', () => { k.classList.add('holding'); timer = setTimeout(() => { stop(); S.navOpen = !S.navOpen; document.body.classList.toggle('nav-open', S.navOpen); }, 1100); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => k.addEventListener(ev, stop));
+  k.addEventListener('contextmenu', e => e.preventDefault());
+})();
+
+function tickClock(){ document.querySelectorAll('[data-clock]').forEach(el => el.textContent = clock()); }
+setInterval(() => {
+  tickClock();
+  if (S.view==='terminal' && S.term.step!=='brand'){
+    const left = Math.ceil((S.term.resetAt - Date.now())/1000);
+    const c = $('#t-count'); if (c) c.textContent = `Skärmen återställs om ${Math.max(0,left)} s`;
+    if (left <= 0) termReset();
+  }
+}, 1000);
+document.addEventListener('pointerdown', () => { if (S.view==='terminal' && S.term.step!=='brand' && S.term.step!=='done') S.term.resetAt = Date.now() + 60000; }, true);
+setInterval(() => {
+  if (store && !S.followDay && dayStr() !== S.day){ S.seen = {}; S.firstSnap = true; subscribeTickets(); }
+  if (S.view !== 'installningar' && !(S.view==='terminal' && S.term.step==='details')) renderData();
+}, 20000);
+
+window.addEventListener('hashchange', route);
+route();
+tickClock();
+
+(async () => {
+  let db = null;
+  if (fbConfigured()){
+    try { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); db.settings({ ignoreUndefinedProperties:true }); }
+    catch(e){ console.error('Firebase kunde inte starta', e); db = null; }
+  }
+  store = db ? fireStore(db) : memStore();
+  const pill = $('#mode-pill');
+  pill.textContent = store.live ? 'Live' : 'Demoläge';
+  pill.classList.toggle('live', store.live);
+  if (!store.live) showBanner(FIREBASE_CONFIG.apiKey
+    ? 'Demoläge: kunde inte ansluta till Firebase. Kontrollera uppgifterna i FIREBASE_CONFIG. Kön sparas bara i den här fliken.'
+    : 'Demoläge: Firebase är inte inställt än, så kön sparas bara i den här fliken. Fyll i FIREBASE_CONFIG överst i index.html.');
+
+  let pruned = false;
+  const prune = () => {
+    if (pruned || !S.user) return;
+    pruned = true;
+    store.prune(dayStr(Date.now() - (cfg().retentionDays||30)*864e5)).catch(() => {});
+  };
+  if (store.live){
+    firebase.auth().onAuthStateChanged(u => {
+      S.user = u; S.authReady = true;
+      $('#logout').hidden = !u;
+      if (u) prune();
+      subscribePrivate();
+      if (S.view==='personal' || S.view==='installningar'){ S.draft = null; S.dirty = false; renderView(); }
+    });
+  } else S.authReady = true;
+
+  /* The customer's phone only listens to its own brand's queue for its own day */
+  if (S.view==='folj' && store.live && S.followId){
+    let t = null;
+    try { t = await store.getTicket(S.followId); } catch {}
+    if (t){ S.followDay = t.day; S.followBrand = t.brand; }
+  }
+  store.watchConfig(c => {
+    S.cfg = c ? { ...clone(DEFAULT_CONFIG), ...c } : null;
+    if (S.view==='installningar'){ if (!S.dirty){ S.draft = clone(cfg()); renderView(); } }
+    else if (!(S.view==='terminal' && S.term.step==='details')) renderView();
+  }, () => {});
+  if (S.view==='folj' && store.live && !S.followBrand){ S.loaded = true; S.raw = []; mergeTickets(); renderData(); }
+  else subscribeTickets();
+})();
+</script>
+
+</body></html>

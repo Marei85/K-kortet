@@ -32,6 +32,9 @@ Kön sparas i Firebase. Tills `FIREBASE_CONFIG` i `index.html` är ifylld körs 
 2. Under **Sign-in method**: slå på **Email/Password**.
 3. Under **Users → Add user**: e-post `personal@kokortet.se` (behöver inte finnas på riktigt) och ett starkt lösenord.
 4. Under **Settings → Authorized domains → Add domain**: `marei85.github.io`
+5. Under **Settings → User actions**: bocka ur **Enable create (sign-up)** och **Enable deletion** och tryck **Save**.
+   Annars kan vem som helst skapa ett eget konto mot projektet med den publika nyckeln i sidan.
+   Reglerna släpper ändå bara in `personal@kokortet.se`, men det ska inte heller gå att skapa konton.
 
 ### 3. Koppla sidan till databasen
 1. Kugghjulet → **Project settings** → **Your apps** → webbikonen `</>`, registrera appen `Kökortet` (Hosting behövs inte).
@@ -47,3 +50,5 @@ Sidan uppdateras på GitHub Pages inom någon minut.
 - **Personuppgifter:** fullständigt namn, mobilnummer och registreringsnummer kan bara inloggad personal läsa. Skärmar och kunders mobiler ser bara "Anna S.". Numret raderas när besöket avslutas, och gamla biljetter raderas efter det antal dagar som står under Inställningar.
 - **Kostnad:** gratisnivån i Firebase räcker för några hundra besök om dagen.
 - **Byta lösenord:** Firebase → Authentication → Users → kontot → Reset password.
+- **Personalkontot** är `personal@kokortet.se`. Adressen står både i `firestore.rules` och som `STAFF_EMAIL` i `index.html`, så byter ni konto måste båda ändras.
+- **Okända konton:** titta ibland under Authentication → Users. Där ska bara personalkontot finnas. Ta bort alla andra.

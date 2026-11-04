@@ -5,8 +5,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Personal = just personalkontot som sidan loggar in med (STAFF_EMAIL i index.html).
+    // Att bara vara inloggad räcker inte: vem som helst kan annars skapa ett eget
+    // konto mot projektet och läsa mobilnummer. Byter ni personalkontots e-post
+    // måste den ändras här och i index.html.
     function isStaff() {
-      return request.auth != null;
+      return request.auth != null
+        && request.auth.token.email == 'personal@kokortet.se'
+        && request.auth.token.firebase.sign_in_provider == 'password';
     }
     function shortText(v, max) {
       return v is string && v.size() <= max;

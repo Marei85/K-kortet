@@ -280,6 +280,12 @@ body.customer #nav{display:none}
 .tv-q .v{font-size:clamp(34px,3.4vw,56px);font-weight:800;color:var(--b);line-height:1}
 .tv-q .s{color:var(--muted);font-size:clamp(15px,1.3vw,20px)}
 .tv-msg{grid-column:1/-1;color:var(--muted);font-size:clamp(16px,1.5vw,24px);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
+#tv-main{display:contents}
+#tv-main>*{position:relative;z-index:1}
+#tv-sound{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.tv-voice{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600}
+.tv-voice select{min-height:38px;width:auto;font-size:15px}
+.tv-hint{font-size:14px;max-width:46ch}
 .tv-empty{display:grid;place-items:center;text-align:center;border:2px dashed var(--line);border-radius:22px;min-height:300px;font-size:clamp(22px,2.4vw,36px);color:var(--muted);padding:24px}
 
 @media (max-width:900px){
@@ -577,24 +583,59 @@ function detectCalls(rows){
 }
 
 /* ---------- Announcements ---------- */
+/* A soft two-tone "ding-dong": lower notes, slow attack, quiet */
 function chime(){
   if (!S.audio) return;
   const ctx = S.audio, now = ctx.currentTime;
-  [[880,0],[660,.32]].forEach(([f,o]) => {
+  [[784,0],[523,.4]].forEach(([f,o]) => {
     const osc = ctx.createOscillator(), g = ctx.createGain();
     osc.type = 'sine'; osc.frequency.value = f;
-    g.gain.setValueAtTime(0, now+o); g.gain.linearRampToValueAtTime(.35, now+o+.02); g.gain.exponentialRampToValueAtTime(.001, now+o+1.1);
-    osc.connect(g).connect(ctx.destination); osc.start(now+o); osc.stop(now+o+1.2);
+    g.gain.setValueAtTime(0, now+o); g.gain.linearRampToValueAtTime(.22, now+o+.06); g.gain.exponentialRampToValueAtTime(.001, now+o+1.5);
+    osc.connect(g).connect(ctx.destination); osc.start(now+o); osc.stop(now+o+1.6);
   });
 }
+
+/* ---------- Uppläsning: en mjuk, kvinnlig svensk röst ----------
+   Rösterna finns i enheten/webbläsaren, så valet sparas per skärm.
+   Kvinnliga svenska röster i önskad ordning: Edge (Sofie, Hillevi – naturliga), Apple (Klara, Alva), Windows (Hedvig), Chrome (Google svenska). */
+const FEMALE_SV = [/sofie/i, /hillevi/i, /klara/i, /alva/i, /hedvig/i, /google svenska/i];
+const MALE_SV = /mattias|oskar|\bmale\b/i;
+function svVoices(){ try { return speechSynthesis.getVoices().filter(v => /^sv([-_]|$)/i.test(v.lang)); } catch { return []; } }
+function voiceRank(v){ const i = FEMALE_SV.findIndex(re => re.test(v.name)); return i >= 0 ? i : MALE_SV.test(v.name) ? 99 : 50; }
+function pickVoice(){
+  const vs = svVoices(); if (!vs.length) return null;
+  const saved = ls.get('voice', '');
+  return vs.find(v => v.name === saved) || [...vs].sort((a,b) => voiceRank(a) - voiceRank(b))[0];
+}
+const voiceLabel = v => v.name.replace(/^Microsoft\s+/, '').replace(/\s*-\s*Swedish.*$/i, '').replace(/Online \(Natural\)/i, '(naturlig)').trim();
+function speak(text){
+  try {
+    const u = new SpeechSynthesisUtterance(text), v = pickVoice();
+    if (v){ u.voice = v; u.lang = v.lang; } else u.lang = 'sv-SE';
+    u.rate = .88; u.pitch = 1; u.volume = .9;   /* lugnt tempo = mjukare intryck */
+    speechSynthesis.speak(u);
+  } catch {}
+}
+const voiceSample = () => callText({ name:'Anna Svensson', brand:brandsOn()[0]?.id, desk:(cfg().desks[1] || cfg().desks[0])?.id, createdAt:Date.now(), calledAt:Date.now() }, 'speech');
+function renderTvSound(){
+  const el = $('#tv-sound'); if (!el) return;
+  if (!S.sound){ el.innerHTML = '<button class="btn" data-act="sound">Slå på ljud och uppläsning</button>'; return; }
+  const vs = svVoices().sort((a,b) => voiceRank(a) - voiceRank(b)), cur = pickVoice();
+  const knownFemale = vs.some(v => voiceRank(v) < FEMALE_SV.length);
+  el.innerHTML = vs.length
+    ? `<label class="tv-voice">Röst <select class="input" id="tv-voice">${vs.map(v => `<option value="${esc(v.name)}" ${v === cur ? 'selected' : ''}>${esc(voiceLabel(v))}</option>`).join('')}</select></label>
+       <button class="btn" data-act="voice-test">Testa</button>
+       ${knownFemale ? '' : '<span class="tv-hint">Ingen kvinnlig svensk röst hittades här. Öppna skärmen i Microsoft Edge för rösten Sofie.</span>'}`
+    : '<span>Ljud på</span><span class="tv-hint">Den här enheten saknar svensk röst. Öppna skärmen i Microsoft Edge för rösten Sofie.</span>';
+}
+try { speechSynthesis.addEventListener('voiceschanged', () => { if (S.view === 'skarm') renderTvSound(); }); } catch {}
+
 function announce(list){
   S.justCalled = new Set(list.map(t => t.id));
   if (S.view === 'skarm' && S.sound){
     chime();
-    try {
-      const say = list.map(t => callText(t, 'speech')).join('. ');
-      setTimeout(() => { const u = new SpeechSynthesisUtterance(say); u.lang = 'sv-SE'; u.rate = .95; speechSynthesis.speak(u); }, 900);
-    } catch {}
+    const say = list.map(t => callText(t, 'speech')).join('. ');
+    setTimeout(() => speak(say), 1300);
   }
   if (S.view === 'terminal') $('#t-ticker')?.classList.add('flash');
   if (S.view === 'folj' && S.followId){
@@ -642,7 +683,11 @@ function renderView(){
   const v = $('#view');
   if (needsLogin()){ v.innerHTML = loginHTML(); setTimeout(() => $('#lg-pw')?.focus(), 50); return; }
   if (S.view==='terminal') v.innerHTML = terminalHTML();
-  else if (S.view==='skarm') v.innerHTML = `<div class="tv tv-wrap" id="tv"></div>`;
+  else if (S.view==='skarm'){
+    /* The sound/voice controls live outside the part that re-renders, so an open voice list is not closed by queue updates */
+    v.innerHTML = `<div class="tv tv-wrap" id="tv"><div id="tv-main"></div><div class="tv-msg"><span id="tv-msg-text"></span><span id="tv-sound"></span></div></div>`;
+    renderTvSound();
+  }
   else if (S.view==='folj') v.innerHTML = `<div class="follow" id="follow"></div>`;
   else if (S.view==='personal') v.innerHTML = staffHTML();
   else { if (!S.draft){ S.draft = clone(cfg()); S.dirty = false; } v.innerHTML = settingsHTML(); }
@@ -940,7 +985,8 @@ function updateFollow(){
 
 /* ---------- Skärm ---------- */
 function updateTv(){
-  const el = $('#tv'); if (!el) return;
+  const el = $('#tv-main'); if (!el) return;
+  $('#tv-msg-text').textContent = cfg().screenMessage || '';
   const called = S.tickets.filter(t => t.status==='called').sort((a,b) => b.calledAt-a.calledAt).slice(0,6);
   const fresh = S.justCalled || new Set(); S.justCalled = null;
   el.innerHTML = `
@@ -953,8 +999,7 @@ function updateTv(){
       </div>`; }).join('') : `<div class="tv-empty">Vi ropar snart nästa kund.<br>Ta gärna en kopp kaffe så länge.</div>`}</div>
     <div class="tv-side">${brandsOn().map(b => { const n = waiting(b.id).length; return `
       <div class="tv-q" style="${bvar(b)}"><div class="top"><h3>${esc(b.name)}</h3><span class="v num">${n}</span></div>
-      <span class="s">${esc(b.tagline)} · ${n ? `${n} i kö, ${waitLabel(estWait(b.id, n))}` : 'ingen kö'}</span></div>`; }).join('')}</div>
-    <div class="tv-msg"><span>${esc(cfg().screenMessage||'')}</span>${S.sound ? '<span>Ljud på</span>' : '<button class="btn" data-act="sound">Slå på ljud och uppläsning</button>'}</div>`;
+      <span class="s">${esc(b.tagline)} · ${n ? `${n} i kö, ${waitLabel(estWait(b.id, n))}` : 'ingen kö'}</span></div>`; }).join('')}</div>`;
   tickClock();
 }
 
@@ -1085,7 +1130,10 @@ document.addEventListener('click', async e => {
       await write(() => store.update(id, { brand:b, purpose:p, status:'waiting', desk:'' }), `Flyttad till ${brand(b)?.name}, platsen i kön behålls`); break; }
     case 'sound': {
       try { S.audio = new (window.AudioContext || window.webkitAudioContext)(); S.sound = true; chime(); } catch { toast('Ljud stöds inte på den här skärmen.'); }
-      updateTv(); break; }
+      renderTvSound();
+      if (S.sound) setTimeout(() => speak('Ljud och uppläsning är på.'), 1300);
+      break; }
+    case 'voice-test': chime(); setTimeout(() => speak(voiceSample()), 1300); break;
     case 'f-notify': {
       try { S.audio = S.audio || new (window.AudioContext || window.webkitAudioContext)(); S.audio.resume?.(); } catch {}
       S.alerts = true;
@@ -1145,6 +1193,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id==='s-desk'){ S.staff.desk = e.target.value; ls.set('desk', S.staff.desk); updateStaff(); }
   if (e.target.id==='a-brand') fillPurposeSelect();
+  if (e.target.id==='tv-voice'){ ls.set('voice', e.target.value); speak(voiceSample()); }
 });
 document.addEventListener('submit', async e => {
   if (e.target.id==='t-form') return termSubmit(e);

@@ -1,49 +1,76 @@
 # Kökortet
 
-Kösystem för receptionen: incheckning på terminal, väntrumsskärm, personalvy, och kundens mobil via QR-kod.
+Kösystem för kundmottagning med incheckning på terminal, väntrumsskärm, personalvy och kundens mobil via QR-kod. Det stöder flera anläggningar.
 
-Sidan ligger på **https://marei85.github.io/K-kortet/**
+Systemet körs på **Cloudflare Workers**. All logik, inloggning och behörighet ligger på servern. Webbsidan innehåller inga nycklar.
+
+## Adresser
+
+Varje anläggning har egna länkar (`<adress>` är er Cloudflare-adress, till exempel `kokortet.<konto>.workers.dev`):
 
 | Enhet | Adress | Inloggning |
 |---|---|---|
-| iPad vid entrén | https://marei85.github.io/K-kortet/#terminal | Nej |
-| TV i loungen | https://marei85.github.io/K-kortet/#skarm | Nej |
-| Disk/verkstad | https://marei85.github.io/K-kortet/#personal | Personalens lösenord |
+| iPad vid entrén | `https://<adress>/kungalv/#terminal` | Nej |
+| TV i loungen | `https://<adress>/kungalv/#skarm` | Nej (kör i Microsoft Edge för rösten Sofie) |
+| Disk/verkstad | `https://<adress>/kungalv/#personal` | Eget konto |
+| Inställningar | `https://<adress>/kungalv/#installningar` | Administratör |
 
-Kunder behöver ingen inloggning. QR-koden efter incheckningen öppnar deras ärende i mobilen.
+Anläggningar från start: `kungalv`, `svedala`, `linkoping`, `brannbacken`. Fler läggs till under Inställningar → Anläggningar, gärna som kopia av en befintlig.
 
-Kön sparas i Firebase. Tills `FIREBASE_CONFIG` i `index.html` är ifylld körs sidan i **demoläge**: allt fungerar på en skärm, men kön delas inte mellan enheterna.
+Logga aldrig in på terminalen eller TV:n. Håll inne det övre högra hörnet i en sekund för att visa menyn.
 
----
+## Roller
 
-## Sätta upp databasen (en gång)
+| Roll | Får |
+|---|---|
+| Personal | Ropa och hantera kunder på sina anläggningar |
+| Anläggningsadministratör | Dessutom ändra anläggningens diskar, tjänster (på/av) och skärmtext, och lägga till personal på sina anläggningar |
+| Central administratör | Allt, även gemensamma inställningar (företag, tjänster, texter, gallring) och nya anläggningar |
 
-### 1. Skapa databasen i Firebase
-1. Gå till https://console.firebase.google.com i Chrome eller Edge och logga in med ett Google-konto, gärna ett gemensamt företagskonto.
-2. Skapa ett projekt, till exempel `kokortet`. Google Analytics behövs inte.
-3. Välj **Databases & Storage → Firestore** (äldre utseende: Build → Firestore Database) och sedan **Create database**.
-   - Utgåva: **Standard**. Databas-ID: låt det vara **(default)**.
-   - Plats: **europe-north2 (Stockholm)** om den finns, annars **europe-north1 (Finland)**.
-   - **Start in production mode**.
-4. Öppna fliken **Rules**. Ersätt allt med innehållet i [`firestore.rules`](firestore.rules) och tryck **Publish**.
+## Struktur
 
-### 2. Skapa personalens inloggning
-1. Välj **Authentication → Get started**.
-2. Under **Sign-in method**: slå på **Email/Password**.
-3. Under **Users → Add user**: e-post `personal@kokortet.se` (behöver inte finnas på riktigt) och ett starkt lösenord.
-4. Under **Settings → Authorized domains → Add domain**: `marei85.github.io`
+```
+public/            webbsidan (statiska filer)
+  index.html       sidans skal och utseende
+  app.js           vyer och händelser – pratar bara med /api
+  shared.js        delad logik: standardinställningar, central/lokal konfiguration
+  _headers         säkerhetsrubriker (Content-Security-Policy m.m.)
+src/
+  worker.js        API: tar emot anrop, kontrollerar inloggning och behörighet
+  hub.js           central Durable Object: konton, inloggningar, anläggningar, gemensam konfiguration
+  site.js          en Durable Object per anläggning: dagens kö, realtid (WebSocket), gallring
+  lib.js           hjälpfunktioner (lösenordshash, svar)
+test/e2e.test.js   helhetstest i riktig webbläsare mot lokal server
+wrangler.jsonc     Cloudflare-konfiguration
+```
 
-### 3. Koppla sidan till databasen
-1. Kugghjulet → **Project settings** → **Your apps** → webbikonen `</>`, registrera appen `Kökortet` (Hosting behövs inte).
-2. Kopiera värdena i `firebaseConfig` och klistra in dem i `FIREBASE_CONFIG` högst upp i `index.html` på grenen `gh-pages`.
-   Uppgifterna är inte hemliga. Säkerheten sköts av reglerna i `firestore.rules`.
+## Säkerhet och personuppgifter
 
-Sidan uppdateras på GitHub Pages inom någon minut.
+- **Lösenord:** hashas med PBKDF2 och 100 000 iterationer. Inloggningen låses i tio minuter efter åtta fel i rad.
+- **Sessioner:** en slumpad nyckel som sparas hashad på servern och gäller i 30 dagar. Den avslutas direkt om kontot stängs av eller ändras.
+- **Behörighet:** varje anrop kontrolleras på servern mot roll och anläggning.
+- **Vad publika vyer får:** terminal, TV och kundens mobil får bara kortnamn (”Anna S.”). Aldrig telefonnummer, regnummer eller efternamn, och aldrig hela kön.
+- **Följlänken:** den i QR-koden är en lång slumpkod som inte går att gissa.
+- **Mobilnummer:** raderas när besöket avslutas. Ärenden som inte avslutats rensas från personuppgifter natten efter, och gamla ärenden raderas automatiskt efter det antal dagar som står under Inställningar (standard 30).
+- **Inga hemligheter i koden:** den enda hemligheten, `SETUP_CODE`, ligger som krypterad hemlighet i Cloudflare.
 
----
+## Driftsättning (en gång)
 
-## Bra att veta
-- **Logga aldrig in som personal på terminalen eller TV:n.** Håll inne det övre högra hörnet i en sekund för att visa menyn.
-- **Personuppgifter:** fullständigt namn, mobilnummer och registreringsnummer kan bara inloggad personal läsa. Skärmar och kunders mobiler ser bara "Anna S.". Numret raderas när besöket avslutas, och gamla biljetter raderas efter det antal dagar som står under Inställningar.
-- **Kostnad:** gratisnivån i Firebase räcker för några hundra besök om dagen.
-- **Byta lösenord:** Firebase → Authentication → Users → kontot → Reset password.
+1. Cloudflare → **Workers & Pages** → **Create application** → **Import a repository** → välj GitHub-repot.
+   Namnet ska vara **kokortet**, samma som i `wrangler.jsonc`.
+2. När första bygget är klart: Workern → **Settings** → **Variables and Secrets** → **Add**.
+   Typ **Secret**, namn `SETUP_CODE`, och en lång kod som du själv väljer. Spara.
+3. Öppna `https://<adress>/`. Ange startkoden och skapa den första centrala administratören.
+   De fyra anläggningarna skapas automatiskt.
+
+Varje push till produktionsgrenen publiceras automatiskt.
+
+## Utveckling och test
+
+```bash
+npm install
+echo "SETUP_CODE=valfri-lokal-kod" > .dev.vars      # används bara lokalt, ignoreras av git
+npm run dev                                          # http://localhost:8787
+npm i -D playwright && npx playwright install chromium
+npm test                                             # startar en egen lokal server och kör helhetstestet
+```

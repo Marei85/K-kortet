@@ -100,6 +100,7 @@ test('terminalen: incheckning utan inloggning, QR-kod med hemlig länk', async (
   S.terminal = page;
   await page.goto(BASE + '/kungalv/#terminal');
   await page.waitForSelector('[data-act="t-brand"][data-id="kvdbil"]');
+  assert.equal((await page.textContent('.t-site')).trim(), 'Kungälv', 'kunden ser vilken anläggning det är');
   await page.click('[data-act="t-brand"][data-id="kvdbil"]');
   await page.click('[data-act="t-purpose"][data-id="hamta"]');
   await page.fill('#t-name', 'Robert Svensson');

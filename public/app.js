@@ -85,6 +85,7 @@ function onSnapshot(m){
   const firstCfg = !S.cfg, cfgChanged = JSON.stringify(m.config) !== JSON.stringify(S.cfg);
   S.cfg = m.config;
   $('#site-name').textContent = m.site?.name || '';
+  document.querySelectorAll('[data-site-name]').forEach(e => { e.textContent = m.site?.name || ''; });
   document.title = 'Kökortet' + (m.site?.name ? ' · ' + m.site.name : '');
   if (m.mode === 'staff'){ S.mode = 'staff'; S.tickets = m.tickets || []; S.called = []; detectCalls(S.tickets); }
   else if (m.mode === 'follow'){ S.mode = 'follow'; S.follow = { ticket:m.ticket, ahead:m.ahead || 0 }; detectCalls(m.ticket ? [m.ticket] : []); }
@@ -315,7 +316,7 @@ function renderData(){
 /* ---------- Terminal ---------- */
 function terminalHTML(){
   const T = S.term, b = brand(T.brand), p = b?.purposes.find(x => x.id===T.purpose);
-  const top = `<div class="t-top"><span class="t-hello">Välkommen in</span><div class="clock num" data-clock></div></div>`;
+  const top = `<div class="t-top"><div class="t-where"><span class="t-hello">Välkommen in</span><span class="t-site" data-site-name>${esc(S.site?.name || '')}</span></div><div class="clock num" data-clock></div></div>`;
   const [fn, fh] = T_FIELD[T.step] || T_FIELD.brand, photo = T.step === 'brand' || T.step === 'done';
   const field = `<aside class="t-field" aria-label="Steg ${fn} ${fh}"><span class="field-number">${fn}</span><span class="field-heading">${fh}</span>
     ${photo ? '<img class="field-photo" src="/brand/hand-car-key-suit.webp" alt="" width="750" height="1000">' : ''}${WORDMARK('navy', 'wm field-mark')}</aside>`;
@@ -550,7 +551,7 @@ function notifyFollow(t){
 }
 function updateFollow(){
   const el = $('#follow'); if (!el) return;
-  const head = `<div class="f-top"><div class="logo">${WORDMARK()}<span class="sep"></span><span class="product">Kökortet</span></div><span class="clock num" data-clock></span></div>`;
+  const head = `<div class="f-top"><div class="logo">${WORDMARK()}<span class="sep"></span><span class="product">Kökortet</span></div><span class="clock num" data-clock></span></div>${S.site?.name ? `<p class="f-site">${esc(S.site.name)}</p>` : ''}`;
   const t = S.follow?.ticket;
   if (!t){
     el.innerHTML = head + `<div class="empty" style="padding:44px 20px">${
@@ -601,7 +602,7 @@ function updateTv(){
   const called = calledNow().slice(0,6);
   const fresh = S.justCalled || new Set(); S.justCalled = null;
   el.innerHTML = `
-    <div class="tv-head"><div><span class="label">${greet()} · ${esc(new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long'}))}</span><h1>Välkommen fram</h1></div><span class="clock num" data-clock></span></div>
+    <div class="tv-head"><div><span class="label">${S.site?.name ? esc(S.site.name) + ' · ' : ''}${greet()} · ${esc(new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long'}))}</span><h1>Välkommen fram</h1></div><span class="clock num" data-clock></span></div>
     <div class="tv-calls">${called.length ? called.map(t => { const d = desk(t.desk), b = brand(t.brand), p = purposeOf(t), dr = dirOf(d); return `
       <div class="tv-call ${fresh.has(t.id)?'new':''}" style="${bvar(b)}">
         <span class="av">${esc(initials(t.name))}</span>

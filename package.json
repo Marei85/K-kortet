@@ -1,0 +1,13 @@
+{
+  "name": "kokortet",
+  "private": true,
+  "description": "Kökortet – kösystem för kundmottagning (Cloudflare Workers + Durable Objects)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test --test-reporter=spec test/*.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.157.0"
+  }
+}

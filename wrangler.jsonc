@@ -1,0 +1,23 @@
+// Kökortet på Cloudflare Workers. Hemligheter (SETUP_CODE) läggs in i Cloudflare, aldrig här.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kokortet",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HUB", "class_name": "Hub" },
+      { "name": "SITE", "class_name": "Site" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Hub", "Site"] }
+  ],
+  "observability": { "enabled": true }
+}

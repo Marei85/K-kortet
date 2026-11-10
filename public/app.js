@@ -1,6 +1,10 @@
 /* Kökortet – webbsidan. All data och behörighet hanteras av servern (/api); här finns bara visning.
    Delad logik (standardinställningar, sammanslagning av central/lokal konfiguration) finns i shared.js som KK. */
-const COLORS = { blue:'Blå', red:'Röd', amber:'Gul', green:'Grön', violet:'Lila', teal:'Petrol' };
+const COLORS = { amber:'Gul', teal:'Teal', red:'Röd', violet:'Magenta', blue:'Blå', green:'Grön' };
+/* kvdbils ordmärke – används alltid som bild, aldrig satt med typsnitt */
+const WORDMARK = (ink = 'navy', cls = 'wm') => `<img class="${cls}" src="/brand/kvdbil-wordmark-${ink}.svg" alt="kvdbil" width="90" height="28">`;
+/* Terminalens funktionsfält: stegnummer och rubrik i ett gult fält till höger, som i kvdbils mallar */
+const T_FIELD = { brand:['01.','Välj ärende'], purpose:['01.','Välj ärende'], details:['02.','Dina uppgifter'], done:['03.','Klart'] };
 const DIRS = { left:['←','till vänster'], right:['→','till höger'], straight:['↑','rakt fram'], back:['↓','bakåt'] };
 const STATUS = { waiting:'Väntar', called:'Ropad', serving:'Betjänas', done:'Klar', noshow:'Kom ej', expired:'Avbruten' };
 const ROLE_NAMES = { central:'Central administratör', site:'Anläggningsadministratör', staff:'Personal' };
@@ -311,7 +315,10 @@ function renderData(){
 /* ---------- Terminal ---------- */
 function terminalHTML(){
   const T = S.term, b = brand(T.brand), p = b?.purposes.find(x => x.id===T.purpose);
-  const top = `<div class="t-top"><div class="logo"><i>K</i>Välkommen in</div><div class="clock num" data-clock></div></div>`;
+  const top = `<div class="t-top"><span class="t-hello">Välkommen in</span><div class="clock num" data-clock></div></div>`;
+  const [fn, fh] = T_FIELD[T.step] || T_FIELD.brand, photo = T.step === 'brand' || T.step === 'done';
+  const field = `<aside class="t-field" aria-label="Steg ${fn} ${fh}"><span class="field-number">${fn}</span><span class="field-heading">${fh}</span>
+    ${photo ? '<img class="field-photo" src="/brand/hand-car-key-suit.webp" alt="" width="750" height="1000">' : ''}${WORDMARK('navy', 'wm field-mark')}</aside>`;
   let body = '';
   if (T.step==='brand'){
     body = `<div class="t-head"><h1>Vad gäller ditt besök?</h1><p>Tryck på det som passar dig. Du behöver ingen papperslapp, vi ropar ditt namn.</p></div>
@@ -368,7 +375,7 @@ function terminalHTML(){
       </div>
     </div>`;
   }
-  return `<div class="term">${top}${body}<div class="t-ticker" id="t-ticker"></div></div>`;
+  return `<div class="t-shell"><div class="term">${top}${body}<div class="t-ticker" id="t-ticker"></div></div>${field}</div>`;
 }
 function updateTerminal(){
   document.querySelectorAll('[data-q]').forEach(el => {
@@ -543,7 +550,7 @@ function notifyFollow(t){
 }
 function updateFollow(){
   const el = $('#follow'); if (!el) return;
-  const head = `<div class="f-top"><div class="logo"><i>K</i>Kökortet</div><span class="clock num" data-clock></span></div>`;
+  const head = `<div class="f-top"><div class="logo">${WORDMARK()}<span class="sep"></span><span class="product">Kökortet</span></div><span class="clock num" data-clock></span></div>`;
   const t = S.follow?.ticket;
   if (!t){
     el.innerHTML = head + `<div class="empty" style="padding:44px 20px">${
@@ -555,21 +562,21 @@ function updateFollow(){
   const ahead = S.follow.ahead || 0;
   let card;
   if (t.status === 'waiting'){
-    card = `<div class="f-card" style="${bvar(b)}"><span class="label">Din plats i kön</span>
-      ${ahead === 0 ? `<span class="f-big" style="color:var(--b)">Näst på tur</span><span class="muted">Du ropas som nästa kund.</span>`
+    card = `<div class="f-card waiting"><span class="label">Din plats i kön</span>
+      ${ahead === 0 ? `<span class="f-big">Näst på tur</span><span class="muted">Du ropas som nästa kund.</span>`
         : `<span class="f-pos num">${ahead}</span><span class="muted">${ahead === 1 ? '1 kund' : ahead + ' kunder'} före dig · ${waitLabel(estWait(t.brand, ahead))}</span>`}
       <span class="muted">${esc(b?.waitText || 'Ta plats i väntrummet')}. Den här sidan säger till när det är din tur.</span></div>`;
   } else if (t.status === 'called'){
-    card = `<div class="f-card called" style="--b:var(--ok)"><span class="label gl-label"><span class="gl"></span>Det är din tur${(t.callCount||1) > 1 ? ' – vi ropar igen' : ''}!</span>
+    card = `<div class="f-card called"><span class="label gl-label"><span class="gl"></span>Det är din tur${(t.callCount||1) > 1 ? ' – vi ropar igen' : ''}!</span>
       <span class="f-big f-call">${callText(t, 'first', true)}</span>
       ${d?.location ? `<span class="muted" style="font-size:18px">${esc(d.location)}</span>` : ''}
       ${dr ? `<span class="dir" role="img" aria-label="${dr[1]}">${dr[0]}</span>` : ''}</div>`;
   } else if (t.status === 'serving'){
-    card = `<div class="f-card" style="--b:var(--ok)"><span class="label" style="color:var(--ok)">Pågår</span><span class="f-big">Du betjänas nu</span><span class="muted">${d ? `Vid ${esc(d.name)}. ` : ''}Trevligt besök!</span></div>`;
+    card = `<div class="f-card"><span class="label">Pågår</span><span class="f-big">Du betjänas nu</span><span class="muted">${d ? `Vid ${esc(d.name)}. ` : ''}Trevligt besök!</span></div>`;
   } else if (t.status === 'noshow'){
-    card = `<div class="f-card" style="--b:var(--warn)"><span class="label" style="color:var(--warn)">Vi ropade dig</span><span class="f-big">Vi fick inget svar</span><span class="muted">Gå fram till disken eller säg till personalen, så hjälper vi dig direkt.</span></div>`;
+    card = `<div class="f-card noshow"><span class="label">Vi ropade dig</span><span class="f-big">Vi fick inget svar</span><span class="muted">Gå fram till disken eller säg till personalen, så hjälper vi dig direkt.</span></div>`;
   } else {
-    card = `<div class="f-card" style="--b:var(--ok)"><span class="f-big">Tack för besöket!</span><span class="muted">Ditt ärende är avslutat. Välkommen åter.</span></div>`;
+    card = `<div class="f-card"><span class="f-big">Tack för besöket!</span><span class="muted">Ditt ärende är avslutat. Välkommen åter.</span></div>`;
   }
   const notis = !['waiting','called'].includes(t.status) ? ''
     : S.alerts
@@ -601,9 +608,9 @@ function updateTv(){
         <span class="nm"><span class="hi"><span class="gl"></span>${esc(b?.name || '')}${p ? ' · ' + esc(p.label) : ''}</span>${callText(t, 'screen', true)}</span>
         <span class="to">${d?.location ? `<span>${esc(d.location)}</span>` : ''}${dr ? `<span class="dir" role="img" aria-label="${dr[1]}">${dr[0]}</span>` : ''}</span>
       </div>`; }).join('') : `<div class="tv-empty">Vi ropar snart nästa kund.<br>Ta gärna en kopp kaffe så länge.</div>`}</div>
-    <div class="tv-side">${brandsOn().map(b => { const n = queueLen(b.id); return `
+    <div class="tv-side"><span class="field-number">Kö</span><span class="field-heading">Just nu</span>${brandsOn().map(b => { const n = queueLen(b.id); return `
       <div class="tv-q" style="${bvar(b)}"><div class="top"><h3>${esc(b.name)}</h3><span class="v num">${n}</span></div>
-      <span class="s">${esc(b.tagline)} · ${n ? `${n} i kö, ${waitLabel(estWait(b.id, n))}` : 'ingen kö'}</span></div>`; }).join('')}</div>`;
+      <span class="s">${esc(b.tagline)} · ${n ? `${n} i kö, ${waitLabel(estWait(b.id, n))}` : 'ingen kö'}</span></div>`; }).join('')}${WORDMARK('navy', 'wm field-mark')}</div>`;
   tickClock();
 }
 

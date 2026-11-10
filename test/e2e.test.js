@@ -271,3 +271,20 @@ test('webbsidan innehåller inga nycklar eller hemligheter', async () => {
   const res = await fetch(BASE + '/kungalv/');
   assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);
 });
+
+test('kvdbils designsystem: ordmärket laddas och sidan hämtar inget från andra webbplatser', async () => {
+  for (const f of ['/brand/kvdbil-wordmark-navy.svg', '/brand/kvdbil-wordmark-white.svg', '/brand/hand-car-key-suit.webp']) {
+    const res = await fetch(BASE + f);
+    assert.equal(res.status, 200, f);
+  }
+  const page = await newPage({ width: 1180, height: 820 });
+  const external = [];
+  page.on('request', r => { if (!r.url().startsWith(BASE) && !r.url().startsWith('data:')) external.push(r.url()); });
+  await page.goto(BASE + '/kungalv/#terminal');
+  await page.waitForSelector('.t-field .field-mark');
+  assert.equal(await page.$eval('.t-field .field-mark', img => img.complete && img.naturalWidth > 0), true, 'ordmärket visas');
+  assert.equal(await text(page, '.t-field .field-number'), '01.');
+  assert.match(await page.$eval('body', b => getComputedStyle(b).fontFamily), /^Arial/);
+  assert.deepEqual(external, [], 'inga externa anrop (typsnitt, skript)');
+});
+

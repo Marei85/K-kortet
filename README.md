@@ -35,6 +35,7 @@ public/            webbsidan (statiska filer)
   app.js           vyer och händelser – pratar bara med /api
   shared.js        delad logik: standardinställningar, central/lokal konfiguration
   _headers         säkerhetsrubriker (Content-Security-Policy m.m.)
+  brand/           kvdbils ordmärke (SVG) och foto från designsystemet
 src/
   worker.js        API: tar emot anrop, kontrollerar inloggning och behörighet
   hub.js           central Durable Object: konton, inloggningar, anläggningar, gemensam konfiguration
@@ -43,6 +44,17 @@ src/
 test/e2e.test.js   helhetstest i riktig webbläsare mot lokal server
 wrangler.jsonc     Cloudflare-konfiguration
 ```
+
+## Utseende: kvdbils designsystem
+
+Utseendet följer organisationens designsystem *Kvdbil designsystem* (från kvdbils PowerPoint-mall):
+
+- **Färger:** gult `#f5b400`, teal `#299d8f` och marinblått `#1a2030` på krämvitt `#f2efe6`. Företagsfärgerna används som ytor med marinblå text, aldrig som textfärg (minst 4,5:1 i kontrast).
+- **Typsnitt:** Arial, regular och bold. Inga webbtypsnitt laddas.
+- **Form:** raka hörn och inga skuggor eller toningar. Bara cirklar (avatarer, stegnummer, pilar) är runda.
+- **Funktionsfältet:** det gula fältet till höger på terminalen (stegnummer `01.`–`03.`) och på väntrumsskärmen (kön).
+- **Logotyp:** ordmärket ligger som SVG i `public/brand/` och används som bild, i marinblått på ljust och vitt på mörkt. Varumärket skrivs med små bokstäver: kvdbil.
+- **Foto:** handen med bilnyckeln från mallens startsida, på gult och förankrad i nederkanten.
 
 ## Säkerhet och personuppgifter
 

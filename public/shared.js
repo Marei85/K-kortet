@@ -3,23 +3,24 @@
 (function (root) {
   'use strict';
 
-  const COLORS = ['blue', 'red', 'amber', 'green', 'violet', 'teal'];
+  /* Färgnamn mappas till kvdbils palett i index.html: amber=gult, teal, red, violet=magenta, blue, green */
+  const COLORS = ['amber', 'teal', 'red', 'violet', 'blue', 'green'];
   const DIR_KEYS = ['left', 'right', 'straight', 'back'];
 
   /* Gemensamt för alla anläggningar: tjänstekatalog, texter, hälsningar, integritet */
   const DEFAULT_CENTRAL = {
     brands: [
-      { id: 'kvdbil', name: 'KVD Bil', tagline: 'Bilförsäljning', prefix: 'K', color: 'blue', purposes: [
+      { id: 'kvdbil', name: 'kvdbil', tagline: 'Bilförsäljning', prefix: 'K', color: 'amber', purposes: [
         { id: 'hamta', label: 'Hämta bil', hint: 'Du har köpt en bil och ska hämta ut den' },
         { id: 'lamna', label: 'Lämna bil', hint: 'Du ska lämna in en bil som vi säljer åt dig' },
         { id: 'provkor', label: 'Provkörning', hint: 'Du har bokat eller vill göra en provkörning' },
         { id: 'ovrigt', label: 'Övrigt ärende', hint: 'Frågor om köp, betalning eller papper' }
       ] },
-      { id: 'autoexperten', name: 'Autoexperten', tagline: 'Verkstadsbesök', prefix: 'A', color: 'red', purposes: [
+      { id: 'autoexperten', name: 'Autoexperten', tagline: 'Verkstadsbesök', prefix: 'A', color: 'teal', purposes: [
         { id: 'inlamning', label: 'Lämna in bil', hint: 'Service, reparation eller däckbyte' },
         { id: 'upphamtning', label: 'Hämta bil', hint: 'Din bil är klar att hämtas' }
       ] },
-      { id: 'carglass', name: 'Carglass', tagline: 'Bilglasbyte', prefix: 'C', color: 'amber', purposes: [
+      { id: 'carglass', name: 'Carglass', tagline: 'Bilglasbyte', prefix: 'C', color: 'red', purposes: [
         { id: 'inlamning', label: 'Lämna in bil', hint: 'Stenskott eller rutbyte' },
         { id: 'upphamtning', label: 'Hämta bil', hint: 'Ditt glasbyte är klart' }
       ] }

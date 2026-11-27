@@ -531,7 +531,10 @@ function fmtPhone(p){
 /* ---------- Följ i mobilen ---------- */
 const followOn = () => cfg().follow?.enabled !== false;
 /* The follow link carries a long random code, not the ticket id, so nobody can guess someone else's link */
-const followLink = fid => `${location.origin}/${SITE}/#folj=${encodeURIComponent(fid)}`;
+/* Länkar och QR-koder pekar alltid på Kökortets egen adress, aldrig på claude.ai */
+const PUBLIC_ORIGIN = 'https://kokortet.martin-reinholdsson.workers.dev';
+const ORIGIN = /^https?:$/.test(location.protocol) && !/(^|\.)(claude\.ai|claude\.com|claudeusercontent\.com)$/.test(location.hostname) ? location.origin : PUBLIC_ORIGIN;
+const followLink = fid => `${ORIGIN}/${SITE}/#folj=${encodeURIComponent(fid)}`;
 function renderQr(){
   const el = $('#t-qr'); if (!el || !S.term.result) return;
   const url = followLink(S.term.result.fid);
@@ -617,7 +620,7 @@ function updateTv(){
 
 /* ---------- Inställningar ---------- */
 function settingsHTML(){
-  const c = S.draft, base = `${location.origin}/${SITE}/`, ro = isCentralAdmin() ? '' : 'disabled';
+  const c = S.draft, base = `${ORIGIN}/${SITE}/`, ro = isCentralAdmin() ? '' : 'disabled';
   const ALL = '<span class="scope">Alla anläggningar</span>', HERE = `<span class="scope">${esc(S.site?.name || 'Den här anläggningen')}</span>`;
   const deskOpts = sel => `<option value="">Ingen förvald</option>` + c.desks.map(d => `<option value="${d.id}" ${d.id===sel?'selected':''}>${esc(d.name)}</option>`).join('');
   return `<div class="settings">

@@ -53,7 +53,7 @@ Utseendet följer organisationens designsystem *Kvdbil designsystem* (från kvdb
 - **Typsnitt:** Arial, regular och bold. Inga webbtypsnitt laddas.
 - **Form:** raka hörn och inga skuggor eller toningar. Bara cirklar (avatarer, stegnummer, pilar) är runda.
 - **Funktionsfältet:** det gula fältet till höger på terminalen (stegnummer `01.`–`03.`) och på väntrumsskärmen (kön).
-- **Logotyp:** ordmärket ligger som SVG i `public/brand/` och används som bild, i marinblått på ljust och vitt på mörkt. Varumärket skrivs med små bokstäver: kvdbil.
+- **Logotyp:** ordmärket ligger som SVG i `public/brand/` och används som bild, i marinblått på ljust och vitt på mörkt. Företagsnamnet visas i texter som Kvdbil; logotypen är alltid ordmärket som bild.
 - **Foto:** handen med bilnyckeln från mallens startsida, på gult och förankrad i nederkanten.
 
 ## Säkerhet och personuppgifter

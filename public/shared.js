@@ -10,7 +10,7 @@
   /* Gemensamt för alla anläggningar: tjänstekatalog, texter, hälsningar, integritet */
   const DEFAULT_CENTRAL = {
     brands: [
-      { id: 'kvdbil', name: 'kvdbil', tagline: 'Bilförsäljning', prefix: 'K', color: 'amber', purposes: [
+      { id: 'kvdbil', name: 'Kvdbil', tagline: 'Bilförsäljning', prefix: 'K', color: 'amber', purposes: [
         { id: 'hamta', label: 'Hämta bil', hint: 'Du har köpt en bil och ska hämta ut den' },
         { id: 'lamna', label: 'Lämna bil', hint: 'Du ska lämna in en bil som vi säljer åt dig' },
         { id: 'provkor', label: 'Provkörning', hint: 'Du har bokat eller vill göra en provkörning' },
